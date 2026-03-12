@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    // Mengizinkan Vercel untuk tetap melanjutkan peluncuran meskipun ada peringatan kecil
-    ignoreDuringBuilds: true,
-  },
+  // Konfigurasi bawaan Next.js
 };
 
 export default nextConfig;
