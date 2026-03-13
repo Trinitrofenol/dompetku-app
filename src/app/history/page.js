@@ -126,7 +126,7 @@ export default function History() {
       <div className="w-full max-w-md bg-slate-50 h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden">
         
         {/* Header */}
-        <div className="px-6 pt-10 pb-4 bg-white z-10 border-b border-slate-100">
+        <div className="px-6 pt-3 pb-4 bg-white z-10 border-b border-slate-100">
           <h1 className="text-2xl font-bold text-slate-800">Riwayat Transaksi</h1>
           <p className="text-[10px] text-cyan-500 font-bold tracking-widest uppercase">Semua Catatan Keuangan</p>
         </div>
@@ -192,7 +192,7 @@ export default function History() {
         </div>
 
         {/* Bottom Navigation */}
-        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] flex justify-between items-center px-6 py-4 pb-8 z-20 pointer-events-auto">
+        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] flex justify-between items-center px-6 py-2 pb-4 z-20 pointer-events-auto">
           <Link href="/" className="flex flex-col items-center gap-1 cursor-pointer opacity-50 hover:opacity-100 transition-opacity"><FaHome className="text-slate-400 text-xl" /><span className="text-[10px] font-bold text-slate-500">Home</span></Link>
           <Link href="/budget" className="flex flex-col items-center gap-1 cursor-pointer opacity-50 hover:opacity-100 transition-opacity"><FaChartPie className="text-slate-400 text-xl" /><span className="text-[10px] font-bold text-slate-500">Budget</span></Link>
           <div className="relative -top-8"><button onClick={() => setIsModalOpen(true)} className="w-16 h-16 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center text-white text-2xl shadow-xl shadow-cyan-500/30 border-4 border-slate-50 active:scale-95 transition-transform"><FaPlus /></button></div>

@@ -320,7 +320,7 @@ export default function Home() {
         {/* AREA KONTEN YANG BISA DI-SCROLL */}
         <div className="flex-1 overflow-y-auto pb-24">
           
-          <div className="px-6 pt-10 pb-4">
+          <div className="px-6 pt-3 pb-4">
             <div className="flex justify-between items-center mb-1">
               <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
               
@@ -406,7 +406,7 @@ export default function Home() {
         </div>
 
         {/* NAVIGASI BAWAH */}
-        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] flex justify-between items-center px-6 py-4 pb-8 z-10 pointer-events-auto">
+        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] flex justify-between items-center px-6 py-2 pb-4 z-10 pointer-events-auto">
           <div className="flex flex-col items-center gap-1 cursor-pointer"><FaHome className="text-cyan-500 text-xl" /><span className="text-[10px] font-bold text-cyan-500">Home</span></div>
           <Link href="/budget" className="flex flex-col items-center gap-1 cursor-pointer opacity-50 hover:opacity-100 transition-opacity"><FaChartPie className="text-slate-400 text-xl" /><span className="text-[10px] font-bold text-slate-500">Budget</span></Link>
           <div className="relative -top-8"><button onClick={() => setIsModalOpen(true)} className="w-16 h-16 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center text-white text-2xl shadow-xl shadow-cyan-500/30 border-4 border-slate-50 active:scale-95 transition-transform"><FaPlus /></button></div>

@@ -140,7 +140,7 @@ export default function Budget() {
       <div className="w-full max-w-md bg-slate-50 h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden">
         
         {/* Header */}
-        <div className="px-6 pt-10 pb-6 bg-white shadow-sm z-10 flex justify-between items-center border-b border-slate-100">
+        <div className="px-6 pt-3 pb-6 bg-white shadow-sm z-10 flex justify-between items-center border-b border-slate-100">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Anggaran</h1>
             <p className="text-[10px] text-cyan-500 font-bold tracking-widest uppercase">{currentMonthName}</p>
@@ -244,7 +244,7 @@ export default function Budget() {
         )}
 
         {/* Bottom Navigation */}
-        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] flex justify-between items-center px-6 py-4 pb-8 z-10 pointer-events-auto">
+        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] flex justify-between items-center px-6 py-2 pb-4 z-10 pointer-events-auto">
           <Link href="/" className="flex flex-col items-center gap-1 cursor-pointer opacity-50 hover:opacity-100 transition-opacity">
             <FaHome className="text-slate-400 text-xl" />
             <span className="text-[10px] font-bold text-slate-500">Home</span>
