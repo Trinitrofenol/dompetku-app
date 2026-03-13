@@ -103,8 +103,10 @@ export default function History() {
   const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   const formatDate = (dateString) => new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
+  // PERBAIKAN: Memaksa kedua ID menjadi String sebelum dicocokkan
   const getWalletName = (walletId) => {
-    const found = wallets.find(w => w.id === walletId);
+    if (!walletId) return '';
+    const found = wallets.find(w => String(w.id) === String(walletId));
     return found ? found.name : walletId;
   };
 
