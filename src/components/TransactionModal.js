@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabase';
 import { 
   FaTimes, FaExchangeAlt, FaUtensils, FaCar, FaGraduationCap, 
   FaFileInvoiceDollar, FaHeartbeat, FaShoppingBag, FaFilm, 
-  FaBox, FaBriefcase, FaClock, FaGift, FaWallet, FaMoneyBillWave 
+  FaBox, FaBriefcase, FaClock, FaGift, FaWallet, FaMoneyBill, FaBuilding,
+  FaCoffee, FaGamepad, FaHome, FaBus, FaTshirt, FaBook, FaDumbbell
 } from "react-icons/fa";
 
 export default function TransactionModal({ isOpen, onClose, onSuccess, wallets = [], userId }) {
@@ -19,12 +20,36 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, wallets =
   const [date, setDate] = useState('');
   const [note, setNote] = useState('');
 
-  // Pastikan dompet default terpilih saat modal dibuka
+  // STATE UNTUK KATEGORI KUSTOM
+  const [customCategories, setCustomCategories] = useState([]);
+
+  // Fungsi pembantu untuk merender Ikon (Kini mendukung class warna/margin dan FaWallet)
+  const renderIcon = (iconName, className = "") => {
+    const icons = {
+      FaBox: <FaBox className={className} />, FaCoffee: <FaCoffee className={className} />, FaGamepad: <FaGamepad className={className} />,
+      FaHome: <FaHome className={className} />, FaBus: <FaBus className={className} />, FaTshirt: <FaTshirt className={className} />,
+      FaHeartbeat: <FaHeartbeat className={className} />, FaBook: <FaBook className={className} />, FaDumbbell: <FaDumbbell className={className} />,
+      FaWallet: <FaWallet className={className} />, FaMoneyBill: <FaMoneyBill className={className} />, FaBuilding: <FaBuilding className={className} />
+    };
+    return icons[iconName] || <FaBox className={className} />;
+  };
+
   useEffect(() => {
     if (wallets.length > 0 && !wallets.find(w => String(w.id) === String(selectedWallet))) {
       setSelectedWallet(String(wallets[0].id));
     }
   }, [wallets, isOpen]);
+
+  // AMBIL KATEGORI KUSTOM DARI DATABASE SAAT MODAL DIBUKA
+  useEffect(() => {
+    if (isOpen && userId) {
+      const fetchCustomCategories = async () => {
+        const { data } = await supabase.from('categories').select('*').eq('user_id', userId);
+        if (data) setCustomCategories(data);
+      };
+      fetchCustomCategories();
+    }
+  }, [isOpen, userId]);
 
   if (!isOpen) return null;
 
@@ -35,13 +60,11 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, wallets =
     
     setIsLoading(true);
 
-    const nominal = parseFloat(amount);
+    const nominal = parseFloat(amount.replace(/\./g, ''));
 
-    // PROTEKSI SALDO MINUS: Cek saldo sebelum menyimpan pengeluaran atau mutasi
     if (transactionType === 'expense' || transactionType === 'transfer') {
       const checkWalletId = String(transactionType === 'transfer' ? transferFrom : selectedWallet);
       
-      // Ambil transaksi user untuk hitung saldo dompet ini
       const { data: txs } = await supabase.from('transactions').select('*').eq('user_id', userId);
       let currentBal = 0;
       
@@ -105,7 +128,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, wallets =
           <div className="flex bg-gradient-to-br from-amber-400 to-orange-500 p-1 rounded-2xl mb-6">
             <button onClick={() => {setTransactionType('expense'); setSelectedCategory('');}} className={`flex-1 py-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all ${transactionType === 'expense' ? 'bg-white text-orange-500 shadow-sm' : 'text-white'}`}>Pengeluaran</button>
             <button onClick={() => {setTransactionType('income'); setSelectedCategory('');}} className={`flex-1 py-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all ${transactionType === 'income' ? 'bg-white text-emerald-500 shadow-sm' : 'text-white'}`}>Pemasukan</button>
-            <button onClick={() => {setTransactionType('transfer'); setSelectedCategory('');}} className={`flex-1 py-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all ${transactionType === 'transfer' ? 'bg-white text-cyan-600 shadow-sm' : 'text-white'}`}>Mutasi</button>
+            <button onClick={() => {setTransactionType('transfer'); setSelectedCategory('');}} className={`flex-1 py-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all ${transactionType === 'transfer' ? 'bg-white text-cyan-500 shadow-sm' : 'text-white'}`}>Mutasi</button>
           </div>
           
           <div className="mb-5">
@@ -115,7 +138,19 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, wallets =
           
           <div className="mb-5">
             <p className="text-[10px] text-slate-400 font-bold mb-2 uppercase">Nominal (Rp)</p>
-            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" className="w-full text-3xl font-bold text-cyan-500 border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 placeholder-slate-300 bg-transparent transition-colors"/>
+            <input 
+              type="text" 
+              inputMode="numeric"
+              value={amount} 
+              onChange={(e) => {
+                // Hanya izinkan angka, lalu tambahkan titik setiap 3 digit
+                const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                const formatted = rawValue ? rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : '';
+                setAmount(formatted);
+              }} 
+              placeholder="0" 
+              className="w-full text-3xl font-bold text-cyan-500 border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 placeholder-slate-300 bg-transparent transition-colors"
+            />
           </div>
           
           {transactionType !== 'transfer' && (
@@ -125,20 +160,36 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, wallets =
                 {transactionType === 'expense' ? (
                   <>
                     <button onClick={() => setSelectedCategory('makanan')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'makanan' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaUtensils/> Makanan</button>
-                    <button onClick={() => setSelectedCategory('kesehatan')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'kesehatan' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaHeartbeat/> Kesehatan</button>
-                    <button onClick={() => setSelectedCategory('transportasi')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'transportasi' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaCar/> Transportasi</button>
-                    <button onClick={() => setSelectedCategory('pendidikan')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'pendidikan' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaGraduationCap/> Pendidikan</button>
+                    <button onClick={() => setSelectedCategory('transport')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'transport' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaCar/> Transportasi</button>
                     <button onClick={() => setSelectedCategory('tagihan')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'tagihan' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaFileInvoiceDollar/> Tagihan</button>
                     <button onClick={() => setSelectedCategory('belanja')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'belanja' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaShoppingBag/> Belanja</button>
                     <button onClick={() => setSelectedCategory('hiburan')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'hiburan' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaFilm/> Hiburan</button>
+                    <button onClick={() => setSelectedCategory('kesehatan')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'kesehatan' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaHeartbeat/> Kesehatan</button>
+                    <button onClick={() => setSelectedCategory('pendidikan')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'pendidikan' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaGraduationCap/> Pendidikan</button>
+
+                    {/* Render Kategori Kustom Pengeluaran */}
+                    {customCategories.filter(c => c.type === 'expense').map(c => (
+                      <button key={c.id} onClick={() => setSelectedCategory(c.name)} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === c.name ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}>
+                        {renderIcon(c.icon)} <span className="capitalize">{c.name}</span>
+                      </button>
+                    ))}
+                    
                     <button onClick={() => setSelectedCategory('lainnya')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'lainnya' ? 'bg-orange-50 border-orange-200 text-orange-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaBox/> Lainnya</button>
                   </>
                 ) : (
                   <>
                     <button onClick={() => setSelectedCategory('gaji')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'gaji' ? 'bg-emerald-50 border-emerald-200 text-emerald-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaBriefcase/> Gaji</button>
                     <button onClick={() => setSelectedCategory('bonus')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'bonus' ? 'bg-emerald-50 border-emerald-200 text-emerald-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaGift/> Bonus</button>
-                    <button onClick={() => setSelectedCategory('Uang Makan')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'Uang Makan' ? 'bg-emerald-50 border-emerald-200 text-emerald-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaUtensils/> Uang Makan</button>
-                    <button onClick={() => setSelectedCategory('Lainnya')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'Lainnya' ? 'bg-emerald-50 border-emerald-200 text-emerald-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaMoneyBillWave/> Lainnya</button>
+                    <button onClick={() => setSelectedCategory('uang makan')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'uang makan' ? 'bg-emerald-50 border-emerald-200 text-emerald-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaUtensils/> Uang Makan</button>
+                    
+                    {/* Render Kategori Kustom Pemasukan */}
+                    {customCategories.filter(c => c.type === 'income').map(c => (
+                      <button key={c.id} onClick={() => setSelectedCategory(c.name)} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === c.name ? 'bg-emerald-50 border-emerald-200 text-emerald-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}>
+                        {renderIcon(c.icon)} <span className="capitalize">{c.name}</span>
+                      </button>
+                    ))}
+                    
+                    <button onClick={() => setSelectedCategory('lainnya')} className={`px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${selectedCategory === 'lainnya' ? 'bg-emerald-50 border-emerald-200 text-emerald-500 shadow-sm' : 'bg-white border-slate-100 text-slate-500'}`}><FaBox/> Lainnya</button>
                   </>
                 )}
               </div>
@@ -155,13 +206,14 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, wallets =
                     onClick={() => setSelectedWallet(String(w.id))} 
                     className={`px-4 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold border whitespace-nowrap transition-all ${String(selectedWallet) === String(w.id) ? 'bg-cyan-50 border-cyan-200 text-cyan-600 shadow-sm' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
                   >
-                    <FaWallet className={String(selectedWallet) === String(w.id) ? "text-cyan-500" : "text-slate-400"}/> {w.name}
+                    {/* Render ikon dompet secara dinamis (menggunakan FaWallet jika belum ada) */}
+                    {renderIcon(w.icon || 'FaWallet', String(selectedWallet) === String(w.id) ? "text-cyan-500 inline mr-2" : "text-slate-400 inline mr-2")} {w.name}
                   </button>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="mb-5 bg-cyan-50 p-4 rounded-3xl border border-slate-100">
+            <div className="mb-5 bg-blue-50 p-4 rounded-3xl border border-slate-100">
               <div className="mb-4">
                 <p className="text-[10px] text-slate-400 font-bold mb-2 uppercase">Dari Kantong (Sumber)</p>
                 <select value={transferFrom} onChange={(e) => setTransferFrom(String(e.target.value))} className="w-full bg-white border border-slate-100 text-slate-800 text-sm font-bold rounded-xl px-3 py-3 shadow-sm focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20">
@@ -182,7 +234,7 @@ export default function TransactionModal({ isOpen, onClose, onSuccess, wallets =
           
           <div className="mb-8">
             <p className="text-[10px] text-slate-400 font-bold mb-2 uppercase">Catatan</p>
-            <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Contoh: Beli makan siang..." className="w-full text-sm font-bold text-slate-800 border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 placeholder-slate-300 bg-transparent transition-colors"/>
+            <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Contoh: Tarik tunai" className="w-full text-sm font-bold text-slate-800 border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 placeholder-slate-300 bg-transparent transition-colors"/>
           </div>
           
           <button onClick={handleSaveTransaction} disabled={isLoading} className={`w-full text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform ${isLoading ? 'bg-slate-300 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-cyan-500/30'}`}>

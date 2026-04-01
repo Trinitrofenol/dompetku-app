@@ -8,7 +8,8 @@ import TransactionModal from '../components/TransactionModal';
 import { 
   FaWallet, FaArrowDown, FaArrowUp, FaHome, FaChartPie, 
   FaPlus, FaChartLine, FaReceipt, FaTimes, FaExchangeAlt, FaUser, 
-  FaChevronLeft, FaCheckCircle, FaExclamationCircle, FaBox, FaSignOutAlt, FaTrash, FaCog
+  FaChevronLeft, FaCheckCircle, FaExclamationCircle, FaBox, FaSignOutAlt, FaTrash, FaCog, FaBuilding,
+  FaTags, FaEdit, FaSave, FaCoffee, FaGamepad, FaBus, FaTshirt, FaHeartbeat, FaBook, FaDumbbell, FaMoneyBill
 } from "react-icons/fa";
 
 export default function Home() {
@@ -36,6 +37,7 @@ export default function Home() {
   const [walletBalances, setWalletBalances] = useState({});
   const [newWalletName, setNewWalletName] = useState('');
   const [walletToDelete, setWalletToDelete] = useState(null);
+  const [newWalletIcon, setNewWalletIcon] = useState('FaWallet');
 
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [debtModalView, setDebtModalView] = useState('list'); 
@@ -54,6 +56,17 @@ export default function Home() {
 
   const [debtToDelete, setDebtToDelete] = useState(null);
 
+  // STATE KELOLA KATEGORI DENGAN IKON
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [categoriesList, setCategoriesList] = useState([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryType, setNewCategoryType] = useState('expense');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('FaBox');
+  const [categoryToEdit, setCategoryToEdit] = useState(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
+  const [editCategoryIcon, setEditCategoryIcon] = useState('');
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+
   const gradientColors = [
     'from-cyan-400 to-blue-500',
     'from-amber-400 to-orange-500',
@@ -61,6 +74,20 @@ export default function Home() {
     'from-emerald-400 to-teal-500',
     'from-rose-400 to-red-500'
   ];
+
+  // Opsi ikon yang bisa dipilih pengguna
+  const iconOptions = ['FaBox', 'FaCoffee', 'FaGamepad', 'FaHome', 'FaBus', 'FaTshirt', 'FaHeartbeat', 'FaBook', 'FaDumbbell', 'FaWallet', 'FaMoneyBill', 'FaBuilding'];
+
+  // Fungsi pembantu untuk merender Ikon
+  const renderIcon = (iconName, className="") => {
+    const icons = {
+      FaBox: <FaBox className={className} />, FaCoffee: <FaCoffee className={className} />, FaGamepad: <FaGamepad className={className} />,
+      FaHome: <FaHome className={className} />, FaBus: <FaBus className={className} />, FaTshirt: <FaTshirt className={className} />,
+      FaHeartbeat: <FaHeartbeat className={className} />, FaBook: <FaBook className={className} />, FaDumbbell: <FaDumbbell className={className} />,
+      FaWallet: <FaWallet className={className} />, FaMoneyBill: <FaMoneyBill className={className} />, FaBuilding: <FaBuilding className={className} />
+    };
+    return icons[iconName] || <FaBox className={className} />;
+  };
 
   useEffect(() => {
     const checkUser = async () => {
@@ -86,6 +113,57 @@ export default function Home() {
     if (user) fetchDashboardData();
   }, [user]);
 
+  useEffect(() => {
+    if (isCategoryModalOpen && user) fetchCategoriesList();
+  }, [isCategoryModalOpen, user]);
+
+  const fetchCategoriesList = async () => {
+    const { data } = await supabase.from('categories').select('*').eq('user_id', user.id);
+    setCategoriesList(data || []);
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName) return;
+    setIsLoading(true);
+    const { error } = await supabase.from('categories').insert([{
+      name: newCategoryName,
+      type: newCategoryType,
+      icon: newCategoryIcon,
+      user_id: user.id
+    }]);
+    setIsLoading(false);
+    if (error) alert("Gagal menambah kategori: " + error.message);
+    else { setNewCategoryName(''); setNewCategoryIcon('FaBox'); fetchCategoriesList(); }
+  };
+
+  const handleUpdateCategory = async () => {
+    if (!editCategoryName) return;
+    setIsLoading(true);
+    const { error } = await supabase.from('categories').update({ 
+      name: editCategoryName,
+      icon: editCategoryIcon
+    }).eq('id', categoryToEdit.id);
+    
+    if (!error) {
+      await supabase.from('transactions').update({ category: editCategoryName }).eq('category', categoryToEdit.name).eq('user_id', user.id);
+    } else {
+      alert("Gagal mengupdate kategori: " + error.message);
+    }
+    setIsLoading(false);
+    setCategoryToEdit(null);
+    fetchCategoriesList();
+    fetchDashboardData();
+  };
+
+  const confirmDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    setIsLoading(true);
+    await supabase.from('categories').delete().eq('id', categoryToDelete.id);
+    setCategoryToDelete(null);
+    fetchCategoriesList();
+    setIsLoading(false);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.replace('/login');
@@ -100,6 +178,7 @@ export default function Home() {
       await supabase.from('debts').delete().eq('user_id', user.id);
       await supabase.from('wallets').delete().eq('user_id', user.id);
       await supabase.from('budgets').delete().eq('user_id', user.id);
+      await supabase.from('categories').delete().eq('user_id', user.id);
 
       setIsResetModalOpen(false);
       setResetConfirmationText('');
@@ -173,10 +252,10 @@ export default function Home() {
     if (!newWalletName) return alert("Nama kantong wajib diisi!");
     setIsLoading(true);
     const randomColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
-    const { error } = await supabase.from('wallets').insert([{ name: newWalletName, color_theme: randomColor, user_id: user.id }]);
+    const { error } = await supabase.from('wallets').insert([{ name: newWalletName, icon: newWalletIcon, color_theme: randomColor, user_id: user.id }]);
     setIsLoading(false);
     if (error) alert("Gagal membuat kantong: " + error.message);
-    else { setIsNewWalletModalOpen(false); setNewWalletName(''); fetchDashboardData(); }
+    else { setIsNewWalletModalOpen(false); setNewWalletName(''); setNewWalletIcon('FaWallet'); fetchDashboardData(); }
   };
 
   const confirmDeleteWallet = async () => {
@@ -212,9 +291,10 @@ export default function Home() {
   const handleSaveDebt = async () => {
     if (!debtAmount || !debtPerson || !debtDate) return alert("Nominal, Nama, dan Tanggal wajib diisi!");
     setIsLoading(true);
-    const nom = parseFloat(debtAmount);
+    
+    // Hapus titik sebelum konversi ke angka
+    const nom = parseFloat(debtAmount.replace(/\./g, ''));
 
-    // PROTEKSI: Cek apakah uang cukup jika kita MEMBERI Piutang (uang keluar)
     if (debtType === 'receivable') {
       const currentBal = walletBalances[debtWallet] || 0;
       if (nom > currentBal) {
@@ -254,9 +334,10 @@ export default function Home() {
   const handlePayDebt = async () => {
     if (!paymentAmount || !paymentDate) return alert("Nominal bayar dan tanggal wajib diisi!");
     setIsLoading(true);
-    const payNom = parseFloat(paymentAmount);
+    
+    // Hapus titik sebelum konversi ke angka
+    const payNom = parseFloat(paymentAmount.replace(/\./g, ''));
 
-    // PROTEKSI: Cek apakah uang cukup jika kita MEMBAYAR Hutang (uang keluar)
     if (debtType === 'payable') {
       const currentBal = walletBalances[paymentWallet] || 0;
       if (payNom > currentBal) {
@@ -339,12 +420,16 @@ export default function Home() {
                     <div className="absolute top-12 right-0 w-48 bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 z-[105] py-2 animate-[fadeIn_0.15s_ease-out] origin-top-right">
                       <div className="absolute -top-2 right-3 w-4 h-4 bg-white border-t border-l border-slate-100 rotate-45"></div>
                       <div className="relative z-10">
+                        <button onClick={() => { setIsSettingsModalOpen(false); setIsCategoryModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                          <FaTags className="text-xs" /> Kelola Kategori
+                        </button>
+                        <div className="w-full h-px bg-slate-100 my-1"></div>
                         <button onClick={() => { setIsSettingsModalOpen(false); setIsResetModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-3">
                           <FaTrash className="text-xs" /> Reset Data
                         </button>
                         <div className="w-full h-px bg-slate-100 my-1"></div>
                         <button onClick={() => { setIsSettingsModalOpen(false); setIsLogoutModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
-                          <FaSignOutAlt className="text-xs" /> Keluar
+                          <FaSignOutAlt className="text-xs" /> Keluar Akun
                         </button>
                       </div>
                     </div>
@@ -352,7 +437,7 @@ export default function Home() {
                 )}
               </div>
             </div>
-            <p className="text-[12px] text-slate-400 font-bold tracking-widest lowercase">{user?.email || 'Keuangan Anda'}</p>
+            <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">{user?.email || 'Keuangan Anda'}</p>
           </div>
           
           <div className="px-6 mb-6">
@@ -376,7 +461,9 @@ export default function Home() {
                   {w.id !== 'tunai' && w.id !== 'rekening' && (
                     <button onClick={(e) => { e.stopPropagation(); setWalletToDelete(w); }} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><FaTrash className="text-xs" /></button>
                   )}
-                  <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${w.color_theme} flex items-center justify-center text-white text-xl mb-4 shadow-md`}><FaWallet /></div>
+                  <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${w.color_theme} flex items-center justify-center text-white text-xl mb-4 shadow-md`}>
+                    {renderIcon(w.icon || 'FaWallet')}
+                  </div>
                   <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase line-clamp-1 w-full pr-2">{w.name}</p>
                   <p className="text-sm font-bold text-slate-800">{formatRupiah(walletBalances[w.id] || 0)}</p>
                 </div>
@@ -416,6 +503,83 @@ export default function Home() {
 
         <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={fetchDashboardData} wallets={wallets} userId={user?.id} />
 
+        {/* MODAL KELOLA KATEGORI BARU */}
+        {isCategoryModalOpen && (
+          <div className="fixed inset-0 z-[120] flex justify-center items-center px-6">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsCategoryModalOpen(false)}></div>
+            <div className="relative bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-100 animate-[slideUp_0.2s_ease-out] max-h-[85vh] flex flex-col">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-slate-800">Kelola Kategori</h3>
+                <button onClick={() => setIsCategoryModalOpen(false)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100"><FaTimes /></button>
+              </div>
+
+              <div className="flex bg-slate-50 p-1 border border-slate-100 rounded-2xl mb-4 shrink-0">
+                <button onClick={() => setNewCategoryType('expense')} className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${newCategoryType === 'expense' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Pengeluaran</button>
+                <button onClick={() => setNewCategoryType('income')} className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${newCategoryType === 'income' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Pemasukan</button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 mb-4 pr-2 space-y-3">
+                {categoriesList.filter(c => c.type === newCategoryType).length === 0 ? (
+                   <p className="text-center text-xs text-slate-400 py-6 border-2 border-dashed border-slate-100 rounded-xl">Belum ada kategori kustom.</p>
+                ) : (
+                   categoriesList.filter(c => c.type === newCategoryType).map(cat => (
+                     <div key={cat.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl bg-slate-50 hover:border-cyan-200 transition-colors">
+                        {categoryToEdit?.id === cat.id ? (
+                           <div className="flex-1 flex flex-col gap-2">
+                             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                               {iconOptions.map(iconName => (
+                                 <button key={iconName} onClick={() => setEditCategoryIcon(iconName)} className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-sm border transition-all ${editCategoryIcon === iconName ? 'bg-cyan-50 border-cyan-400 text-cyan-500' : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                                   {renderIcon(iconName)}
+                                 </button>
+                               ))}
+                             </div>
+                             <input autoFocus type="text" value={editCategoryName} onChange={e => setEditCategoryName(e.target.value)} className="w-full bg-white border border-cyan-400 text-sm font-bold px-3 py-2 rounded-lg focus:outline-none shadow-sm" />
+                           </div>
+                        ) : (
+                           <span className="font-bold text-sm text-slate-700 capitalize flex items-center gap-3">
+                             <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm ${newCategoryType === 'expense' ? 'bg-orange-400' : 'bg-emerald-400'}`}>
+                               {renderIcon(cat.icon || 'FaBox')}
+                             </span> 
+                             {cat.name}
+                           </span>
+                        )}
+                        
+                        <div className="flex gap-2 ml-3">
+                           {categoryToEdit?.id === cat.id ? (
+                              <div className="flex flex-col gap-2">
+                                <button onClick={handleUpdateCategory} disabled={isLoading} className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center hover:bg-emerald-200"><FaSave/></button>
+                                <button onClick={() => setCategoryToEdit(null)} className="w-8 h-8 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-300"><FaTimes/></button>
+                              </div>
+                           ) : (
+                              <>
+                                <button onClick={() => { setCategoryToEdit(cat); setEditCategoryName(cat.name); setEditCategoryIcon(cat.icon || 'FaBox'); }} className="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center hover:bg-cyan-100"><FaEdit/></button>
+                                <button onClick={() => setCategoryToDelete(cat)} className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100"><FaTrash/></button>
+                              </>
+                           )}
+                        </div>
+                     </div>
+                   ))
+                )}
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 shrink-0">
+                <p className="text-[10px] font-bold mb-2 text-slate-400">PILIH IKON & TAMBAH KATEGORI</p>
+                <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide mb-1">
+                  {iconOptions.map(iconName => (
+                    <button key={iconName} onClick={() => setNewCategoryIcon(iconName)} className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-lg border transition-all ${newCategoryIcon === iconName ? 'bg-cyan-50 border-cyan-400 text-cyan-500 shadow-sm' : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                      {renderIcon(iconName)}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Contoh: Kopi, Pulsa..." className="flex-1 text-sm font-bold border-2 border-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:border-cyan-400 bg-transparent transition-colors"/>
+                  <button onClick={handleAddCategory} disabled={!newCategoryName || isLoading} className="bg-cyan-500 text-white w-12 rounded-xl flex items-center justify-center hover:bg-cyan-600 disabled:bg-slate-300 transition-colors shadow-md shadow-cyan-500/20"><FaPlus/></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* MODAL KONFIRMASI RESET DATA */}
         {isResetModalOpen && (
           <div className="fixed inset-0 z-[120] flex justify-center items-center px-6">
@@ -424,7 +588,7 @@ export default function Home() {
               <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-2xl mb-4 mx-auto"><FaExclamationCircle /></div>
               <h3 className="text-xl font-bold text-slate-800 text-center mb-2">Reset Semua Data?</h3>
               <p className="text-sm text-slate-500 text-center mb-4">
-                Tindakan ini <strong className="text-red-500">TIDAK BISA DIBATALKAN</strong>. Seluruh riwayat transaksi, dompet, hutang, dan anggaran Anda akan dihapus permanen.
+                Tindakan ini <strong className="text-red-500">TIDAK BISA DIBATALKAN</strong>. Seluruh riwayat transaksi, dompet, hutang, kategori, dan anggaran Anda akan dihapus permanen.
               </p>
               <div className="mb-6">
                 <p className="text-[10px] font-bold mb-2 text-slate-400 text-center uppercase tracking-widest">Ketik "HAPUS" untuk konfirmasi</p>
@@ -494,11 +658,39 @@ export default function Home() {
                   <h3 className="text-lg font-bold text-slate-800">Buat Kantong Baru</h3>
                   <button onClick={() => setIsNewWalletModalOpen(false)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100"><FaTimes /></button>
                 </div>
+
+                <div className="mb-6">
+                  <p className="text-[10px] font-bold mb-2 text-slate-400">PILIH IKON KANTONG</p>
+                  <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
+                    {iconOptions.map(iconName => (
+                      <button key={iconName} onClick={() => setNewWalletIcon(iconName)} className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-lg border transition-all ${newWalletIcon === iconName ? 'bg-cyan-50 border-cyan-400 text-cyan-500 shadow-sm' : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                        {renderIcon(iconName)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="mb-8">
                   <p className="text-[10px] font-bold mb-2 text-slate-400">NAMA KANTONG</p>
                   <input type="text" value={newWalletName} onChange={(e) => setNewWalletName(e.target.value)} placeholder="Contoh: Dana Darurat, Cicilan Motor..." className="w-full text-lg font-bold text-slate-800 border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 bg-transparent placeholder-slate-300"/>
                 </div>
                 <button onClick={handleCreateWallet} disabled={isLoading} className="w-full bg-gradient-to-r from-cyan-400 to-blue-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-cyan-500/30 active:scale-95 transition-transform">{isLoading ? 'Membuat...' : 'Buat Kantong'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL KONFIRMASI HAPUS KATEGORI */}
+        {categoryToDelete && (
+          <div className="fixed inset-0 z-[130] flex justify-center items-center px-6">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setCategoryToDelete(null)}></div>
+            <div className="relative bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 animate-[slideUp_0.2s_ease-out]">
+              <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-2xl mb-4 mx-auto"><FaTrash /></div>
+              <h3 className="text-xl font-bold text-slate-800 text-center mb-2">Hapus Kategori?</h3>
+              <p className="text-sm text-slate-500 text-center mb-6">Anda yakin ingin menghapus kategori kustom <span className="text-cyan-500 font-bold capitalize">"{categoryToDelete.name}"</span>? Transaksi lama dengan kategori ini tidak akan terhapus dari riwayat.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setCategoryToDelete(null)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Batal</button>
+                <button onClick={confirmDeleteCategory} disabled={isLoading} className="flex-1 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 transition-colors">{isLoading ? 'Menghapus...' : 'Ya, Hapus'}</button>
               </div>
             </div>
           </div>
@@ -540,9 +732,26 @@ export default function Home() {
                     <div className="flex items-center mb-6 pb-2 border-b border-slate-100"><button onClick={() => setDebtModalView('list')} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 mr-3 hover:bg-slate-100"><FaChevronLeft /></button><h3 className="text-lg font-bold text-slate-800">{debtType === 'payable' ? 'Catat Hutang Baru' : 'Catat Piutang Baru'}</h3></div>
                     <div className={`p-3 rounded-xl mb-6 text-xs font-medium flex gap-2 items-start ${debtType === 'payable' ? 'bg-orange-50 text-orange-600' : 'bg-cyan-50 text-cyan-600'}`}>{debtType === 'payable' ? "💡 Saldo dompet akan bertambah." : "💡 Saldo dompet akan berkurang."}</div>
                     <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">TANGGAL TRANSAKSI</p><input type="date" value={debtDate} onChange={(e) => setDebtDate(e.target.value)} className="w-full text-sm font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 text-slate-800 bg-transparent"/></div>
-                    <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">NOMINAL (RP)</p><input type="number" value={debtAmount} onChange={(e) => setDebtAmount(e.target.value)} placeholder="0" className="w-full text-3xl font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 text-cyan-500 bg-transparent placeholder-slate-300"/></div>
+                    
+                    {/* BAGIAN YANG DIPERBARUI: FORMAT TITIK UNTUK HUTANG BARU */}
+                    <div className="mb-5">
+                      <p className="text-[10px] font-bold mb-2 text-slate-400">NOMINAL (RP)</p>
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={debtAmount} 
+                        onChange={(e) => {
+                          const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                          const formatted = rawValue ? rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : '';
+                          setDebtAmount(formatted);
+                        }} 
+                        placeholder="0" 
+                        className="w-full text-3xl font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 text-cyan-500 bg-transparent placeholder-slate-300"
+                      />
+                    </div>
+                    
                     <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">{debtType === 'payable' ? 'NAMA PEMBERI PINJAMAN' : 'NAMA PEMINJAM'}</p><div className="flex items-center border-b-2 border-slate-100 pb-2 focus-within:border-cyan-400 transition-colors"><FaUser className="text-slate-400 mr-2" /><input type="text" value={debtPerson} onChange={(e) => setDebtPerson(e.target.value)} placeholder="Contoh: Budi, Bank..." className="w-full text-sm font-bold focus:outline-none bg-transparent text-slate-800 placeholder-slate-400"/></div></div>
-                    <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">MASUK/KELUAR DARI KANTONG</p><div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{wallets.map(w => ( <button key={w.id} onClick={() => setDebtWallet(w.id)} className={`px-4 py-3 rounded-xl border font-bold text-sm whitespace-nowrap transition-all ${debtWallet === w.id ? 'bg-cyan-50 border-cyan-200 text-cyan-600' : 'bg-white border-slate-100 text-slate-500'}`}><FaWallet className="inline mr-2"/>{w.name}</button> ))}</div></div>
+                    <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">MASUK/KELUAR DARI KANTONG</p><div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{wallets.map(w => ( <button key={w.id} onClick={() => setDebtWallet(w.id)} className={`px-4 py-3 rounded-xl border font-bold text-sm whitespace-nowrap transition-all ${debtWallet === w.id ? 'bg-cyan-50 border-cyan-200 text-cyan-600' : 'bg-white border-slate-100 text-slate-500'}`}>{renderIcon(w.icon || 'FaWallet', "inline mr-2")}{w.name}</button> ))}</div></div>
                     <div className="mb-8"><p className="text-[10px] font-bold mb-2 text-slate-400">TENGGAT LUNAS (OPSIONAL)</p><input type="date" value={debtDueDate} onChange={(e) => setDebtDueDate(e.target.value)} className="w-full text-sm font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 bg-transparent text-slate-800"/></div>
                     <button onClick={handleSaveDebt} disabled={isLoading} className={`w-full text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform ${isLoading ? 'bg-slate-300' : debtType === 'payable' ? 'bg-gradient-to-r from-orange-400 to-amber-500 shadow-orange-500/30' : 'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-cyan-500/30'}`}>{isLoading ? 'Menyimpan...' : 'Simpan Catatan'}</button>
                   </div>
@@ -552,8 +761,25 @@ export default function Home() {
                     <div className="flex items-center mb-6 pb-2 border-b border-slate-100"><button onClick={() => setDebtModalView('list')} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 mr-3 hover:bg-slate-100"><FaChevronLeft /></button><h3 className="text-lg font-bold text-slate-800">Pembayaran Cicilan</h3></div>
                     <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl mb-6"><p className="text-[10px] text-slate-400 font-bold mb-1">DETAIL TAGIHAN</p><h4 className="font-bold text-slate-800 flex items-center gap-2"><FaUser className="text-cyan-500 text-xs"/> {selectedDebt.person_name}</h4><div className="flex justify-between mt-3 pt-3 border-t border-slate-200"><span className="text-xs font-bold text-slate-500">SISA TAGIHAN:</span><span className="text-sm font-bold text-slate-800">{formatRupiah(Number(selectedDebt.amount) - Number(selectedDebt.paid_amount || 0))}</span></div></div>
                     <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">TANGGAL BAYAR</p><input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="w-full text-sm font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 bg-transparent text-slate-800"/></div>
-                    <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">NOMINAL BAYAR (RP)</p><input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="0" className="w-full text-3xl font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 bg-transparent text-cyan-500 placeholder-slate-300"/></div>
-                    <div className="mb-8"><p className="text-[10px] font-bold mb-2 text-slate-400">{debtType === 'payable' ? 'SUMBER DANA PEMBAYARAN' : 'MASUK KE KANTONG'}</p><div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{wallets.map(w => ( <button key={w.id} onClick={() => setPaymentWallet(w.id)} className={`px-4 py-3 rounded-xl border font-bold text-sm whitespace-nowrap transition-all ${paymentWallet === w.id ? 'bg-cyan-50 border-cyan-200 text-cyan-600' : 'bg-white border-slate-100 text-slate-500'}`}><FaWallet className="inline mr-2"/>{w.name}</button> ))}</div></div>
+                    
+                    {/* BAGIAN YANG DIPERBARUI: FORMAT TITIK UNTUK PEMBAYARAN CICILAN */}
+                    <div className="mb-5">
+                      <p className="text-[10px] font-bold mb-2 text-slate-400">NOMINAL BAYAR (RP)</p>
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={paymentAmount} 
+                        onChange={(e) => {
+                          const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                          const formatted = rawValue ? rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : '';
+                          setPaymentAmount(formatted);
+                        }} 
+                        placeholder="0" 
+                        className="w-full text-3xl font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 bg-transparent text-cyan-500 placeholder-slate-300"
+                      />
+                    </div>
+                    
+                    <div className="mb-8"><p className="text-[10px] font-bold mb-2 text-slate-400">{debtType === 'payable' ? 'SUMBER DANA PEMBAYARAN' : 'MASUK KE KANTONG'}</p><div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{wallets.map(w => ( <button key={w.id} onClick={() => setPaymentWallet(w.id)} className={`px-4 py-3 rounded-xl border font-bold text-sm whitespace-nowrap transition-all ${paymentWallet === w.id ? 'bg-cyan-50 border-cyan-200 text-cyan-600' : 'bg-white border-slate-100 text-slate-500'}`}>{renderIcon(w.icon || 'FaWallet', "inline mr-2")}{w.name}</button> ))}</div></div>
                     <button onClick={handlePayDebt} disabled={isLoading} className={`w-full text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform ${isLoading ? 'bg-slate-300' : debtType === 'payable' ? 'bg-gradient-to-r from-orange-400 to-amber-500 shadow-orange-500/30' : 'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-cyan-500/30'}`}>{isLoading ? 'Memproses...' : 'Proses Pembayaran'}</button>
                   </div>
                 )}

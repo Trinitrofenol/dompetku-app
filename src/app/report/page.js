@@ -8,7 +8,8 @@ import TransactionModal from '../../components/TransactionModal';
 import { 
   FaHome, FaChartPie, FaPlus, FaChartLine, FaReceipt,
   FaUtensils, FaCar, FaGraduationCap, FaFileInvoiceDollar, FaHeartbeat, 
-  FaShoppingBag, FaFilm, FaBox, FaFilter
+  FaShoppingBag, FaFilm, FaBox, FaFilter,
+  FaCoffee, FaGamepad, FaBus, FaTshirt, FaBook, FaDumbbell, FaWallet, FaMoneyBill, FaBuilding
 } from "react-icons/fa";
 
 export default function Report() {
@@ -21,8 +22,10 @@ export default function Report() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [wallets, setWallets] = useState([]);
+  
+  // STATE UNTUK KATEGORI KUSTOM
+  const [customCategories, setCustomCategories] = useState([]);
 
-  // State untuk Filter Bulan dan Tahun
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -35,6 +38,16 @@ export default function Report() {
     'belanja': { name: 'Belanja', icon: <FaShoppingBag />, color: 'bg-teal-500', barColor: 'bg-teal-400' },
     'hiburan': { name: 'Hiburan', icon: <FaFilm />, color: 'bg-indigo-500', barColor: 'bg-indigo-400' },
     'lainnya': { name: 'Lainnya', icon: <FaBox />, color: 'bg-slate-500', barColor: 'bg-slate-400' }
+  };
+
+  const renderIcon = (iconName, className="") => {
+    const icons = {
+      FaBox: <FaBox className={className} />, FaCoffee: <FaCoffee className={className} />, FaGamepad: <FaGamepad className={className} />,
+      FaHome: <FaHome className={className} />, FaBus: <FaBus className={className} />, FaTshirt: <FaTshirt className={className} />,
+      FaHeartbeat: <FaHeartbeat className={className} />, FaBook: <FaBook className={className} />, FaDumbbell: <FaDumbbell className={className} />,
+      FaWallet: <FaWallet className={className} />, FaMoneyBill: <FaMoneyBill className={className} />, FaBuilding: <FaBuilding className={className} />
+    };
+    return icons[iconName] || <FaBox className={className} />;
   };
 
   const monthNames = [
@@ -55,7 +68,6 @@ export default function Report() {
     checkUser();
   }, [router]);
 
-  // Panggil fetchReport setiap kali user, bulan, atau tahun berubah
   useEffect(() => {
     if (user) fetchReport();
   }, [user, selectedMonth, selectedYear]);
@@ -73,12 +85,14 @@ export default function Report() {
     if (walletData && walletData.length > 0) allWallets = [...defaultWallets, ...walletData];
     setWallets(allWallets);
 
-    // Hitung tanggal awal dan akhir bulan yang dipilih
+    // Ambil daftar kategori kustom
+    const { data: catData } = await supabase.from('categories').select('*').eq('user_id', user.id).eq('type', 'expense');
+    if (catData) setCustomCategories(catData);
+
     const startStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
     const endDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
     const endStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-    // Hanya ambil transaksi pada bulan dan tahun yang difilter
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
@@ -139,7 +153,7 @@ export default function Report() {
           <p className="text-[10px] text-cyan-500 font-bold tracking-widest uppercase">Analisis Pengeluaran</p>
         </div>
 
-        {/* Filter (Senada dengan halaman History) */}
+        {/* Filter */}
         <div className="px-6 py-3 bg-white border-b border-slate-100 flex gap-2 z-10 shadow-sm">
           <div className="flex items-center justify-center bg-slate-50 w-10 rounded-xl text-slate-400 border border-slate-100">
             <FaFilter />
@@ -184,7 +198,18 @@ export default function Report() {
           ) : (
             <div className="space-y-4">
               {expenseData.map((item) => {
-                const catInfo = categoryMap[item.category] || { name: item.category, icon: <FaBox />, color: 'bg-slate-500', barColor: 'bg-slate-400' };
+                let catInfo = categoryMap[item.category];
+                
+                // MENGGABUNGKAN IKON KUSTOM JIKA TIDAK ADA DI DAFTAR BAWAAN
+                if (!catInfo) {
+                  const customCat = customCategories.find(c => c.name === item.category);
+                  if (customCat) {
+                    catInfo = { name: customCat.name, icon: renderIcon(customCat.icon), color: 'bg-cyan-500', barColor: 'bg-cyan-400' };
+                  } else {
+                    catInfo = { name: item.category, icon: <FaBox />, color: 'bg-slate-500', barColor: 'bg-slate-400' };
+                  }
+                }
+
                 return (
                   <div key={item.id} className="bg-white p-4 rounded-3xl shadow-lg shadow-slate-200/50 border border-slate-100 transition-transform hover:scale-[1.01]">
                     <div className="flex items-center gap-4 mb-3">
