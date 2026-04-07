@@ -9,7 +9,8 @@ import {
   FaWallet, FaArrowDown, FaArrowUp, FaHome, FaChartPie, 
   FaPlus, FaChartLine, FaReceipt, FaTimes, FaExchangeAlt, FaUser, 
   FaChevronLeft, FaCheckCircle, FaExclamationCircle, FaBox, FaSignOutAlt, FaTrash, FaCog, FaBuilding,
-  FaTags, FaEdit, FaSave, FaCoffee, FaGamepad, FaBus, FaTshirt, FaHeartbeat, FaBook, FaDumbbell, FaMoneyBill
+  FaTags, FaEdit, FaSave, FaCoffee, FaGamepad, FaBus, FaTshirt, FaHeartbeat, FaBook, FaDumbbell, FaMoneyBill, FaCalendarAlt,
+  FaEllipsisV
 } from "react-icons/fa";
 
 export default function Home() {
@@ -39,6 +40,16 @@ export default function Home() {
   const [walletToDelete, setWalletToDelete] = useState(null);
   const [newWalletIcon, setNewWalletIcon] = useState('FaWallet');
 
+  const [transactions, setTransactions] = useState([]); 
+
+  // STATE UNTUK RINCIAN KANTONG & EDIT
+  const [isWalletDetailOpen, setIsWalletDetailOpen] = useState(false);
+  const [selectedWalletDetail, setSelectedWalletDetail] = useState(null);
+  const [isWalletSettingsOpen, setIsWalletSettingsOpen] = useState(false);
+  const [isEditWalletModalOpen, setIsEditWalletModalOpen] = useState(false);
+  const [editWalletName, setEditWalletName] = useState('');
+  const [editWalletIcon, setEditWalletIcon] = useState('');
+
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [debtModalView, setDebtModalView] = useState('list'); 
   const [debtsList, setDebtsList] = useState([]); 
@@ -67,6 +78,11 @@ export default function Home() {
   const [editCategoryIcon, setEditCategoryIcon] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState(null);
 
+  // STATE UNTUK SIKLUS LAPORAN & NOTIFIKASI
+  const [isCycleModalOpen, setIsCycleModalOpen] = useState(false);
+  const [cycleDateInput, setCycleDateInput] = useState(1);
+  const [successNotification, setSuccessNotification] = useState(null);
+
   const gradientColors = [
     'from-cyan-400 to-blue-500',
     'from-amber-400 to-orange-500',
@@ -75,10 +91,8 @@ export default function Home() {
     'from-rose-400 to-red-500'
   ];
 
-  // Opsi ikon yang bisa dipilih pengguna
   const iconOptions = ['FaBox', 'FaCoffee', 'FaGamepad', 'FaHome', 'FaBus', 'FaTshirt', 'FaHeartbeat', 'FaBook', 'FaDumbbell', 'FaWallet', 'FaMoneyBill', 'FaBuilding'];
 
-  // Fungsi pembantu untuk merender Ikon
   const renderIcon = (iconName, className="") => {
     const icons = {
       FaBox: <FaBox className={className} />, FaCoffee: <FaCoffee className={className} />, FaGamepad: <FaGamepad className={className} />,
@@ -169,6 +183,25 @@ export default function Home() {
     router.replace('/login');
   };
 
+  const handleSaveCycle = async () => {
+    if (cycleDateInput < 1 || cycleDateInput > 28) {
+      setSuccessNotification({ title: 'Peringatan', message: 'Masukkan tanggal antara 1 hingga 28.', isError: true });
+      return;
+    }
+    setIsLoading(true);
+    const { data, error } = await supabase.auth.updateUser({
+      data: { payday_date: Number(cycleDateInput) }
+    });
+    setIsLoading(false);
+    if (error) {
+      setSuccessNotification({ title: 'Gagal', message: "Gagal menyimpan siklus: " + error.message, isError: true });
+    } else {
+      setUser(data.user);
+      setIsCycleModalOpen(false);
+      setSuccessNotification({ title: 'Berhasil!', message: 'Siklus laporan berhasil diperbarui.', isError: false });
+    }
+  };
+
   const handleResetData = async () => {
     if (resetConfirmationText !== 'HAPUS' || !user) return;
     setIsLoading(true);
@@ -203,7 +236,7 @@ export default function Home() {
     if (walletData && walletData.length > 0) allWallets = [...defaultWallets, ...walletData];
     setWallets(allWallets);
 
-    const { data: trxData } = await supabase.from('transactions').select('*').eq('user_id', user.id);
+    const { data: trxData } = await supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false });
     const { data: debtData } = await supabase.from('debts').select('*').eq('user_id', user.id).order('date', { ascending: false });
     
     let income = 0; let expense = 0; let hutang = 0; let piutang = 0;
@@ -211,6 +244,7 @@ export default function Home() {
     allWallets.forEach(w => balances[w.id] = 0);
 
     if (trxData) {
+      setTransactions(trxData);
       trxData.forEach(trx => {
         const nom = Number(trx.amount);
         if (trx.type === 'income') income += nom;
@@ -258,13 +292,50 @@ export default function Home() {
     else { setIsNewWalletModalOpen(false); setNewWalletName(''); setNewWalletIcon('FaWallet'); fetchDashboardData(); }
   };
 
+  // FUNGSI UPDATE KANTONG (BARU)
+  const handleUpdateWallet = async () => {
+    if (!editWalletName) return alert("Nama kantong wajib diisi!");
+    setIsLoading(true);
+    const { error } = await supabase
+      .from('wallets')
+      .update({ name: editWalletName, icon: editWalletIcon })
+      .eq('id', selectedWalletDetail.id);
+
+    setIsLoading(false);
+    if (error) {
+      alert("Gagal mengupdate kantong: " + error.message);
+    } else {
+      setIsEditWalletModalOpen(false);
+      // Update state lokal agar Rincian Kantong langsung berubah
+      setSelectedWalletDetail({ ...selectedWalletDetail, name: editWalletName, icon: editWalletIcon });
+      fetchDashboardData();
+    }
+  };
+
   const confirmDeleteWallet = async () => {
     if (!walletToDelete) return;
+
+    // PROTEKSI: Cek saldo sebelum menghapus kantong
+    const currentBalance = walletBalances[walletToDelete.id] || 0;
+    if (currentBalance !== 0) {
+      setWalletToDelete(null);
+      setSuccessNotification({ 
+        title: 'Aksi Ditolak', 
+        message: 'Kantong tidak dapat dihapus karena masih memiliki saldo. Silakan pindahkan (mutasi) atau kosongkan saldo terlebih dahulu.', 
+        isError: true 
+      });
+      return;
+    }
+
     setIsLoading(true);
     const { error } = await supabase.from('wallets').delete().eq('id', walletToDelete.id);
     setIsLoading(false);
     if (error) alert("Gagal menghapus kantong: " + error.message);
-    else { setWalletToDelete(null); fetchDashboardData(); }
+    else { 
+      setWalletToDelete(null); 
+      setIsWalletDetailOpen(false); 
+      fetchDashboardData(); 
+    }
   };
 
   const confirmDeleteDebt = async () => {
@@ -291,8 +362,6 @@ export default function Home() {
   const handleSaveDebt = async () => {
     if (!debtAmount || !debtPerson || !debtDate) return alert("Nominal, Nama, dan Tanggal wajib diisi!");
     setIsLoading(true);
-    
-    // Hapus titik sebelum konversi ke angka
     const nom = parseFloat(debtAmount.replace(/\./g, ''));
 
     if (debtType === 'receivable') {
@@ -334,8 +403,6 @@ export default function Home() {
   const handlePayDebt = async () => {
     if (!paymentAmount || !paymentDate) return alert("Nominal bayar dan tanggal wajib diisi!");
     setIsLoading(true);
-    
-    // Hapus titik sebelum konversi ke angka
     const payNom = parseFloat(paymentAmount.replace(/\./g, ''));
 
     if (debtType === 'payable') {
@@ -424,6 +491,10 @@ export default function Home() {
                           <FaTags className="text-xs" /> Kelola Kategori
                         </button>
                         <div className="w-full h-px bg-slate-100 my-1"></div>
+                        <button onClick={() => { setIsSettingsModalOpen(false); setCycleDateInput(user?.user_metadata?.payday_date || 1); setIsCycleModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                          <FaCalendarAlt className="text-xs" /> Siklus Laporan
+                        </button>
+                        <div className="w-full h-px bg-slate-100 my-1"></div>
                         <button onClick={() => { setIsSettingsModalOpen(false); setIsResetModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-3">
                           <FaTrash className="text-xs" /> Reset Data
                         </button>
@@ -455,12 +526,11 @@ export default function Home() {
 
           <div className="px-6 mb-6">
             <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-bold text-slate-800 flex items-center gap-2"><FaWallet className="text-cyan-500" /> Kantong Anda</h3></div>
+            
+            {/* TAMPILAN KARTU KANTONG DIPERBERSIH */}
             <div className="grid grid-cols-2 gap-4 mb-4">
               {wallets.map(w => (
-                <div key={w.id} className="relative bg-white rounded-3xl p-5 shadow-lg shadow-slate-200/50 border border-slate-100 flex flex-col items-start transition-transform hover:scale-[1.02] cursor-pointer group">
-                  {w.id !== 'tunai' && w.id !== 'rekening' && (
-                    <button onClick={(e) => { e.stopPropagation(); setWalletToDelete(w); }} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><FaTrash className="text-xs" /></button>
-                  )}
+                <div key={w.id} onClick={() => { setSelectedWalletDetail(w); setIsWalletDetailOpen(true); setIsWalletSettingsOpen(false); }} className="relative bg-white rounded-3xl p-5 shadow-lg shadow-slate-200/50 border border-slate-100 flex flex-col items-start transition-transform hover:scale-[1.02] cursor-pointer group">
                   <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${w.color_theme} flex items-center justify-center text-white text-xl mb-4 shadow-md`}>
                     {renderIcon(w.icon || 'FaWallet')}
                   </div>
@@ -469,6 +539,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
+
             <button onClick={() => setIsNewWalletModalOpen(true)} className="w-full bg-white hover:bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-4 flex items-center justify-center gap-3 transition-colors group shadow-sm">
               <div className="w-8 h-8 rounded-full bg-cyan-50 flex items-center justify-center text-cyan-500 group-hover:bg-cyan-500 group-hover:text-white transition-colors"><FaPlus /></div>
               <span className="text-sm font-bold text-slate-500 group-hover:text-cyan-600">Tambah Kantong</span>
@@ -580,6 +651,64 @@ export default function Home() {
           </div>
         )}
 
+        {/* MODAL KONFIRMASI HAPUS KATEGORI */}
+        {categoryToDelete && (
+          <div className="fixed inset-0 z-[130] flex justify-center items-center px-6">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setCategoryToDelete(null)}></div>
+            <div className="relative bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 animate-[slideUp_0.2s_ease-out]">
+              <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-2xl mb-4 mx-auto"><FaTrash /></div>
+              <h3 className="text-xl font-bold text-slate-800 text-center mb-2">Hapus Kategori?</h3>
+              <p className="text-sm text-slate-500 text-center mb-6">Anda yakin ingin menghapus kategori kustom <span className="text-cyan-500 font-bold capitalize">"{categoryToDelete.name}"</span>? Transaksi lama dengan kategori ini tidak akan terhapus dari riwayat.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setCategoryToDelete(null)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Batal</button>
+                <button onClick={confirmDeleteCategory} disabled={isLoading} className="flex-1 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 transition-colors">{isLoading ? 'Menghapus...' : 'Ya, Hapus'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL PENGATURAN SIKLUS LAPORAN */}
+        {isCycleModalOpen && (
+          <div className="fixed inset-0 z-[120] flex justify-center items-center px-6">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsCycleModalOpen(false)}></div>
+            <div className="relative bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 animate-[slideUp_0.2s_ease-out]">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-slate-800">Siklus Laporan</h3>
+                <button onClick={() => setIsCycleModalOpen(false)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100"><FaTimes /></button>
+              </div>
+              <div className="p-4 bg-cyan-50 rounded-xl mb-6">
+                <p className="text-xs font-medium text-cyan-700 leading-relaxed">
+                  Tentukan tanggal gajian/awal bulan keuangan Anda. Laporan akan dihitung dari tanggal ini hingga 1 hari sebelum tanggal ini di bulan berikutnya.
+                </p>
+              </div>
+              <div className="mb-6">
+                <p className="text-[10px] font-bold mb-2 text-slate-400 uppercase">Tanggal Mulai Siklus (1 - 28)</p>
+                <input type="number" min="1" max="28" value={cycleDateInput} onChange={(e) => setCycleDateInput(e.target.value)} className="w-full text-2xl font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 text-slate-800 bg-transparent"/>
+              </div>
+              <button onClick={handleSaveCycle} disabled={isLoading} className={`w-full text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform ${isLoading ? 'bg-slate-300' : 'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-cyan-500/30'}`}>
+                {isLoading ? 'Menyimpan...' : 'Simpan Pengaturan'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL NOTIFIKASI BERHASIL/GAGAL */}
+        {successNotification && (
+          <div className="fixed inset-0 z-[150] flex justify-center items-center px-6">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSuccessNotification(null)}></div>
+            <div className="relative bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 animate-[slideUp_0.2s_ease-out]">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-4 mx-auto ${successNotification.isError ? 'bg-red-50 text-red-500' : 'bg-cyan-50 text-cyan-500'}`}>
+                {successNotification.isError ? <FaExclamationCircle /> : <FaCheckCircle />}
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 text-center mb-2">{successNotification.title}</h3>
+              <p className="text-sm text-slate-500 text-center mb-6">{successNotification.message}</p>
+              <button onClick={() => setSuccessNotification(null)} className="w-full py-3 rounded-xl font-bold text-white bg-cyan-500 hover:bg-cyan-600 shadow-lg shadow-cyan-500/20 transition-colors">
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* MODAL KONFIRMASI RESET DATA */}
         {isResetModalOpen && (
           <div className="fixed inset-0 z-[120] flex justify-center items-center px-6">
@@ -618,8 +747,9 @@ export default function Home() {
           </div>
         )}
 
+        {/* MODAL KONFIRMASI HAPUS KANTONG */}
         {walletToDelete && (
-          <div className="fixed inset-0 z-[110] flex justify-center items-center px-6">
+          <div className="fixed inset-0 z-[130] flex justify-center items-center px-6">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setWalletToDelete(null)}></div>
             <div className="relative bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 animate-[slideUp_0.2s_ease-out]">
               <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-2xl mb-4 mx-auto"><FaTrash /></div>
@@ -649,6 +779,7 @@ export default function Home() {
           </div>
         )}
 
+        {/* MODAL BUAT KANTONG BARU */}
         {isNewWalletModalOpen && (
           <div className="fixed inset-0 z-[100] flex justify-center">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsNewWalletModalOpen(false)}></div>
@@ -680,17 +811,33 @@ export default function Home() {
           </div>
         )}
 
-        {/* MODAL KONFIRMASI HAPUS KATEGORI */}
-        {categoryToDelete && (
-          <div className="fixed inset-0 z-[130] flex justify-center items-center px-6">
-            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setCategoryToDelete(null)}></div>
-            <div className="relative bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 animate-[slideUp_0.2s_ease-out]">
-              <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-2xl mb-4 mx-auto"><FaTrash /></div>
-              <h3 className="text-xl font-bold text-slate-800 text-center mb-2">Hapus Kategori?</h3>
-              <p className="text-sm text-slate-500 text-center mb-6">Anda yakin ingin menghapus kategori kustom <span className="text-cyan-500 font-bold capitalize">"{categoryToDelete.name}"</span>? Transaksi lama dengan kategori ini tidak akan terhapus dari riwayat.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setCategoryToDelete(null)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Batal</button>
-                <button onClick={confirmDeleteCategory} disabled={isLoading} className="flex-1 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 transition-colors">{isLoading ? 'Menghapus...' : 'Ya, Hapus'}</button>
+        {/* MODAL EDIT KANTONG */}
+        {isEditWalletModalOpen && (
+          <div className="fixed inset-0 z-[120] flex justify-center">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsEditWalletModalOpen(false)}></div>
+            <div className="w-full max-w-md relative flex flex-col justify-end pointer-events-none">
+              <div className="bg-white w-full rounded-t-[2rem] p-6 shadow-2xl animate-[slideUp_0.3s_ease-out] pointer-events-auto">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-bold text-slate-800">Edit Kantong</h3>
+                  <button onClick={() => setIsEditWalletModalOpen(false)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100"><FaTimes /></button>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-[10px] font-bold mb-2 text-slate-400">PILIH IKON KANTONG</p>
+                  <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
+                    {iconOptions.map(iconName => (
+                      <button key={iconName} onClick={() => setEditWalletIcon(iconName)} className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-lg border transition-all ${editWalletIcon === iconName ? 'bg-cyan-50 border-cyan-400 text-cyan-500 shadow-sm' : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                        {renderIcon(iconName)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <p className="text-[10px] font-bold mb-2 text-slate-400">NAMA KANTONG</p>
+                  <input type="text" value={editWalletName} onChange={(e) => setEditWalletName(e.target.value)} placeholder="Contoh: Dana Darurat..." className="w-full text-lg font-bold text-slate-800 border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 bg-transparent placeholder-slate-300"/>
+                </div>
+                <button onClick={handleUpdateWallet} disabled={isLoading} className="w-full bg-gradient-to-r from-cyan-400 to-blue-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-cyan-500/30 active:scale-95 transition-transform">{isLoading ? 'Menyimpan...' : 'Simpan Perubahan'}</button>
               </div>
             </div>
           </div>
@@ -732,8 +879,6 @@ export default function Home() {
                     <div className="flex items-center mb-6 pb-2 border-b border-slate-100"><button onClick={() => setDebtModalView('list')} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 mr-3 hover:bg-slate-100"><FaChevronLeft /></button><h3 className="text-lg font-bold text-slate-800">{debtType === 'payable' ? 'Catat Hutang Baru' : 'Catat Piutang Baru'}</h3></div>
                     <div className={`p-3 rounded-xl mb-6 text-xs font-medium flex gap-2 items-start ${debtType === 'payable' ? 'bg-orange-50 text-orange-600' : 'bg-cyan-50 text-cyan-600'}`}>{debtType === 'payable' ? "💡 Saldo dompet akan bertambah." : "💡 Saldo dompet akan berkurang."}</div>
                     <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">TANGGAL TRANSAKSI</p><input type="date" value={debtDate} onChange={(e) => setDebtDate(e.target.value)} className="w-full text-sm font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 text-slate-800 bg-transparent"/></div>
-                    
-                    {/* BAGIAN YANG DIPERBARUI: FORMAT TITIK UNTUK HUTANG BARU */}
                     <div className="mb-5">
                       <p className="text-[10px] font-bold mb-2 text-slate-400">NOMINAL (RP)</p>
                       <input 
@@ -749,7 +894,6 @@ export default function Home() {
                         className="w-full text-3xl font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 text-cyan-500 bg-transparent placeholder-slate-300"
                       />
                     </div>
-                    
                     <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">{debtType === 'payable' ? 'NAMA PEMBERI PINJAMAN' : 'NAMA PEMINJAM'}</p><div className="flex items-center border-b-2 border-slate-100 pb-2 focus-within:border-cyan-400 transition-colors"><FaUser className="text-slate-400 mr-2" /><input type="text" value={debtPerson} onChange={(e) => setDebtPerson(e.target.value)} placeholder="Contoh: Budi, Bank..." className="w-full text-sm font-bold focus:outline-none bg-transparent text-slate-800 placeholder-slate-400"/></div></div>
                     <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">MASUK/KELUAR DARI KANTONG</p><div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{wallets.map(w => ( <button key={w.id} onClick={() => setDebtWallet(w.id)} className={`px-4 py-3 rounded-xl border font-bold text-sm whitespace-nowrap transition-all ${debtWallet === w.id ? 'bg-cyan-50 border-cyan-200 text-cyan-600' : 'bg-white border-slate-100 text-slate-500'}`}>{renderIcon(w.icon || 'FaWallet', "inline mr-2")}{w.name}</button> ))}</div></div>
                     <div className="mb-8"><p className="text-[10px] font-bold mb-2 text-slate-400">TENGGAT LUNAS (OPSIONAL)</p><input type="date" value={debtDueDate} onChange={(e) => setDebtDueDate(e.target.value)} className="w-full text-sm font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 bg-transparent text-slate-800"/></div>
@@ -761,8 +905,6 @@ export default function Home() {
                     <div className="flex items-center mb-6 pb-2 border-b border-slate-100"><button onClick={() => setDebtModalView('list')} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 mr-3 hover:bg-slate-100"><FaChevronLeft /></button><h3 className="text-lg font-bold text-slate-800">Pembayaran Cicilan</h3></div>
                     <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl mb-6"><p className="text-[10px] text-slate-400 font-bold mb-1">DETAIL TAGIHAN</p><h4 className="font-bold text-slate-800 flex items-center gap-2"><FaUser className="text-cyan-500 text-xs"/> {selectedDebt.person_name}</h4><div className="flex justify-between mt-3 pt-3 border-t border-slate-200"><span className="text-xs font-bold text-slate-500">SISA TAGIHAN:</span><span className="text-sm font-bold text-slate-800">{formatRupiah(Number(selectedDebt.amount) - Number(selectedDebt.paid_amount || 0))}</span></div></div>
                     <div className="mb-5"><p className="text-[10px] font-bold mb-2 text-slate-400">TANGGAL BAYAR</p><input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="w-full text-sm font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 bg-transparent text-slate-800"/></div>
-                    
-                    {/* BAGIAN YANG DIPERBARUI: FORMAT TITIK UNTUK PEMBAYARAN CICILAN */}
                     <div className="mb-5">
                       <p className="text-[10px] font-bold mb-2 text-slate-400">NOMINAL BAYAR (RP)</p>
                       <input 
@@ -778,11 +920,117 @@ export default function Home() {
                         className="w-full text-3xl font-bold border-b-2 border-slate-100 pb-2 focus:outline-none focus:border-cyan-400 bg-transparent text-cyan-500 placeholder-slate-300"
                       />
                     </div>
-                    
                     <div className="mb-8"><p className="text-[10px] font-bold mb-2 text-slate-400">{debtType === 'payable' ? 'SUMBER DANA PEMBAYARAN' : 'MASUK KE KANTONG'}</p><div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{wallets.map(w => ( <button key={w.id} onClick={() => setPaymentWallet(w.id)} className={`px-4 py-3 rounded-xl border font-bold text-sm whitespace-nowrap transition-all ${paymentWallet === w.id ? 'bg-cyan-50 border-cyan-200 text-cyan-600' : 'bg-white border-slate-100 text-slate-500'}`}>{renderIcon(w.icon || 'FaWallet', "inline mr-2")}{w.name}</button> ))}</div></div>
                     <button onClick={handlePayDebt} disabled={isLoading} className={`w-full text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform ${isLoading ? 'bg-slate-300' : debtType === 'payable' ? 'bg-gradient-to-r from-orange-400 to-amber-500 shadow-orange-500/30' : 'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-cyan-500/30'}`}>{isLoading ? 'Memproses...' : 'Proses Pembayaran'}</button>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL RINCIAN KANTONG & RIWAYAT (ALA BANK JAGO) */}
+        {isWalletDetailOpen && selectedWalletDetail && (
+          <div className="fixed inset-0 z-[100] flex justify-center">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsWalletDetailOpen(false)}></div>
+            <div className="w-full max-w-md relative flex flex-col justify-end pointer-events-none">
+              <div className="bg-white w-full rounded-t-[2rem] p-6 shadow-2xl animate-[slideUp_0.3s_ease-out] max-h-[90vh] flex flex-col pointer-events-auto">
+                
+                {/* Header Rincian dengan Tombol Settings */}
+                <div className="flex justify-between items-center mb-6 pb-2 border-b border-slate-100 shrink-0 relative">
+                  <button onClick={() => {setIsWalletDetailOpen(false); setIsWalletSettingsOpen(false);}} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100"><FaChevronLeft /></button>
+                  <h3 className="text-lg font-bold text-slate-800">Rincian Kantong</h3>
+                  
+                  {/* Tombol Pengaturan Kantong (Hanya untuk kantong kustom) */}
+                  {selectedWalletDetail.id !== 'tunai' && selectedWalletDetail.id !== 'rekening' ? (
+                    <div className="relative">
+                      <button onClick={() => setIsWalletSettingsOpen(!isWalletSettingsOpen)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 focus:outline-none">
+                        <FaEllipsisV className="text-sm" />
+                      </button>
+                      
+                      {/* Dropdown Settings Kantong */}
+                      {isWalletSettingsOpen && (
+                        <>
+                          <div className="fixed inset-0 z-[105]" onClick={() => setIsWalletSettingsOpen(false)}></div>
+                          <div className="absolute top-10 right-0 w-44 bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 z-[110] py-2 animate-[fadeIn_0.15s_ease-out] origin-top-right">
+                            <button onClick={() => { setIsWalletSettingsOpen(false); setEditWalletName(selectedWalletDetail.name); setEditWalletIcon(selectedWalletDetail.icon || 'FaWallet'); setIsEditWalletModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                              <FaEdit className="text-xs" /> Edit Kantong
+                            </button>
+                            <div className="w-full h-px bg-slate-100 my-1"></div>
+                            <button onClick={() => { 
+                                setIsWalletSettingsOpen(false); 
+                                
+                                // PROTEKSI: Tolak klik jika saldo masih ada
+                                const currentBalance = walletBalances[selectedWalletDetail.id] || 0;
+                                if (currentBalance !== 0) {
+                                  setSuccessNotification({ 
+                                    title: 'Aksi Ditolak', 
+                                    message: 'Kantong tidak dapat dihapus karena masih berisi uang. Silakan pindahkan (mutasi) saldo terlebih dahulu.', 
+                                    isError: true 
+                                  });
+                                } else {
+                                  setWalletToDelete(selectedWalletDetail); 
+                                }
+                              }} className="w-full text-left px-5 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-3">
+                              <FaTrash className="text-xs" /> Hapus Kantong
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="w-8"></div>
+                  )}
+                </div>
+
+                {/* Info Kantong Utama */}
+                <div className="flex flex-col items-center mb-6 shrink-0">
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${selectedWalletDetail.color_theme} flex items-center justify-center text-white text-3xl mb-3 shadow-md`}>
+                    {renderIcon(selectedWalletDetail.icon || 'FaWallet')}
+                  </div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{selectedWalletDetail.name}</p>
+                  <h2 className="text-3xl font-extrabold text-slate-800 mt-1">{formatRupiah(walletBalances[selectedWalletDetail.id] || 0)}</h2>
+                </div>
+
+                {/* Area Daftar Transaksi Khusus Kantong Ini */}
+                <div className="overflow-y-auto flex-1 pr-2 pb-4">
+                  <h4 className="text-xs font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2 sticky top-0 bg-white z-10">Riwayat Mutasi Kantong</h4>
+                  
+                  {transactions.filter(t => String(t.wallet_from) === String(selectedWalletDetail.id) || String(t.wallet_to) === String(selectedWalletDetail.id)).length === 0 ? (
+                    <div className="text-center py-8 text-slate-400">
+                      <FaReceipt className="mx-auto text-3xl mb-3 opacity-20" />
+                      <p className="text-xs font-medium">Belum ada transaksi di kantong ini.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {transactions
+                        .filter(t => String(t.wallet_from) === String(selectedWalletDetail.id) || String(t.wallet_to) === String(selectedWalletDetail.id))
+                        .map(trx => {
+                          const isIncome = trx.type === 'income' || trx.type === 'debt_in' || trx.type === 'debt_payment_in' || (trx.type === 'transfer' && String(trx.wallet_to) === String(selectedWalletDetail.id));
+                          
+                          return (
+                            <div key={trx.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-2xl bg-slate-50 hover:bg-white hover:shadow-sm transition-all">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-sm ${isIncome ? 'bg-emerald-100 text-emerald-500' : 'bg-orange-100 text-orange-500'}`}>
+                                  {isIncome ? <FaArrowUp /> : <FaArrowDown />}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-slate-800 text-xs capitalize">{trx.category.replace('_', ' ')}</p>
+                                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">{formatDate(trx.date)}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className={`font-bold text-sm ${isIncome ? 'text-emerald-500' : 'text-orange-500'}`}>
+                                  {isIncome ? '+' : '-'}{formatRupiah(trx.amount)}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

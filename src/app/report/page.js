@@ -8,7 +8,7 @@ import TransactionModal from '../../components/TransactionModal';
 import { 
   FaHome, FaChartPie, FaPlus, FaChartLine, FaReceipt,
   FaUtensils, FaCar, FaGraduationCap, FaFileInvoiceDollar, FaHeartbeat, 
-  FaShoppingBag, FaFilm, FaBox, FaFilter,
+  FaShoppingBag, FaFilm, FaBox, FaFilter, FaSyncAlt, FaCalendarDay,
   FaCoffee, FaGamepad, FaBus, FaTshirt, FaBook, FaDumbbell, FaWallet, FaMoneyBill, FaBuilding
 } from "react-icons/fa";
 
@@ -23,8 +23,10 @@ export default function Report() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [wallets, setWallets] = useState([]);
   
-  // STATE UNTUK KATEGORI KUSTOM
+  // STATE UNTUK KATEGORI KUSTOM DAN MODE SIKLUS
   const [customCategories, setCustomCategories] = useState([]);
+  const [reportMode, setReportMode] = useState('calendar'); // 'calendar' | 'cycle'
+  const [displayDateRange, setDisplayDateRange] = useState('');
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -70,7 +72,7 @@ export default function Report() {
 
   useEffect(() => {
     if (user) fetchReport();
-  }, [user, selectedMonth, selectedYear]);
+  }, [user, selectedMonth, selectedYear, reportMode]);
 
   const fetchReport = async () => {
     if (!user) return;
@@ -89,9 +91,26 @@ export default function Report() {
     const { data: catData } = await supabase.from('categories').select('*').eq('user_id', user.id).eq('type', 'expense');
     if (catData) setCustomCategories(catData);
 
-    const startStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
-    const endDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-    const endStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    const paydayDate = user.user_metadata?.payday_date || 1;
+    let startStr, endStr;
+
+    // Logika perhitungan tanggal kalender vs siklus
+    if (reportMode === 'calendar' || paydayDate === 1) {
+      startStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
+      const endDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      endStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+      setDisplayDateRange(`${monthNames[selectedMonth]} ${selectedYear}`);
+    } else {
+      const startDate = new Date(selectedYear, selectedMonth - 1, paydayDate);
+      const endDate = new Date(selectedYear, selectedMonth, paydayDate - 1);
+      
+      const formatYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      startStr = formatYMD(startDate);
+      endStr = formatYMD(endDate);
+      
+      const formatDisplay = (d) => `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      setDisplayDateRange(`${formatDisplay(startDate)} - ${formatDisplay(endDate)}`);
+    }
 
     const { data, error } = await supabase
       .from('transactions')
@@ -153,36 +172,49 @@ export default function Report() {
           <p className="text-[10px] text-cyan-500 font-bold tracking-widest uppercase">Analisis Pengeluaran</p>
         </div>
 
-        {/* Filter */}
-        <div className="px-6 py-3 bg-white border-b border-slate-100 flex gap-2 z-10 shadow-sm">
-          <div className="flex items-center justify-center bg-slate-50 w-10 rounded-xl text-slate-400 border border-slate-100">
-            <FaFilter />
+        {/* Filter dengan Mode Opsi */}
+        <div className="px-6 py-3 bg-white flex flex-col gap-3 z-10 shadow-sm border-b border-slate-100">
+          
+          {/* Tombol Opsi Mode Laporan */}
+          <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+             <button onClick={() => setReportMode('calendar')} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${reportMode === 'calendar' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+               <FaCalendarDay/> Kalender
+             </button>
+             <button onClick={() => setReportMode('cycle')} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${reportMode === 'cycle' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+               <FaSyncAlt/> Siklus (Tgl {user?.user_metadata?.payday_date || 1})
+             </button>
           </div>
-          <select 
-            value={selectedMonth} 
-            onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="flex-1 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 appearance-none"
-          >
-            {monthNames.map((month, index) => (
-              <option key={index} value={index}>{month}</option>
-            ))}
-          </select>
-          <select 
-            value={selectedYear} 
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="w-24 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 appearance-none"
-          >
-            {[...Array(5)].map((_, i) => {
-              const year = new Date().getFullYear() - i;
-              return <option key={year} value={year}>{year}</option>;
-            })}
-          </select>
+
+          <div className="flex gap-2">
+            <div className="flex items-center justify-center bg-slate-50 w-10 rounded-xl text-slate-400 border border-slate-100">
+              <FaFilter />
+            </div>
+            <select 
+              value={selectedMonth} 
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="flex-1 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 appearance-none"
+            >
+              {monthNames.map((month, index) => (
+                <option key={index} value={index}>{month}</option>
+              ))}
+            </select>
+            <select 
+              value={selectedYear} 
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="w-24 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 appearance-none"
+            >
+              {[...Array(5)].map((_, i) => {
+                const year = new Date().getFullYear() - i;
+                return <option key={year} value={year}>{year}</option>;
+              })}
+            </select>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-6 pb-24">
           <div className="bg-gradient-to-br from-cyan-400 to-blue-500 rounded-[2rem] p-6 text-white shadow-xl shadow-cyan-500/30 mb-8 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-3xl -mr-10 -mt-10"></div>
-            <p className="text-[10px] text-cyan-50 font-bold tracking-wider mb-1 uppercase">TOTAL PENGELUARAN • {monthNames[selectedMonth]} {selectedYear}</p>
+            <p className="text-[10px] text-cyan-50 font-bold tracking-wider mb-1 uppercase">TOTAL PENGELUARAN • {displayDateRange}</p>
             <h2 className="text-3xl font-extrabold tracking-tight">{formatRupiah(totalMonthExpense)}</h2>
           </div>
 
