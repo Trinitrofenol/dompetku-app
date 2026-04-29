@@ -1,7 +1,11 @@
-import { Inter } from "next/font/google";
+import { Lato } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+// Font Lato memerlukan spesifikasi 'weight' (ketebalan font)
+const lato = Lato({ 
+  subsets: ["latin"],
+  weight: ['400', '700', '900'] // Memuat ketebalan reguler (400), bold (700), dan black (900)
+});
 
 // INI ADALAH BAGIAN UNTUK MENGUBAH JUDUL DAN DESKRIPSI
 export const metadata = {
@@ -12,7 +16,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="id">
-      <body className={inter.className}>{children}</body>
+      <body className={lato.className}>{children}</body>
     </html>
   );
 }

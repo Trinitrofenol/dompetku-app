@@ -8,7 +8,7 @@ import TransactionModal from '../../components/TransactionModal';
 import { 
   FaHome, FaChartPie, FaPlus, FaChartLine, FaReceipt, FaTimes, FaTrash,
   FaUtensils, FaCar, FaGraduationCap, FaFileInvoiceDollar, FaHeartbeat, 
-  FaShoppingBag, FaFilm, FaBox, FaFilter,
+  FaShoppingBag, FaFilm, FaBox, FaFilter, FaSyncAlt, FaCalendarDay,
   FaCoffee, FaGamepad, FaBus, FaTshirt, FaBook, FaDumbbell, FaWallet, FaMoneyBill, FaBuilding
 } from "react-icons/fa";
 
@@ -29,6 +29,10 @@ export default function Budget() {
   const [selectedCategory, setSelectedCategory] = useState('makanan');
   const [budgetAmount, setBudgetAmount] = useState('');
   const [budgetToDelete, setBudgetToDelete] = useState(null);
+
+  // STATE UNTUK TAB NAVIGASI MODE
+  const [budgetMode, setBudgetMode] = useState('calendar'); // 'calendar' | 'cycle'
+  const [displayDateRange, setDisplayDateRange] = useState('');
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -68,9 +72,10 @@ export default function Budget() {
     checkUser();
   }, [router]);
 
+  // Efek berjalan ulang jika mode (calendar/cycle) berubah
   useEffect(() => {
     if (user) fetchBudgetData();
-  }, [user, selectedMonth, selectedYear]);
+  }, [user, selectedMonth, selectedYear, budgetMode]);
 
   const fetchBudgetData = async () => {
     setIsLoading(true);
@@ -85,15 +90,53 @@ export default function Budget() {
     const { data: catData } = await supabase.from('categories').select('*').eq('user_id', user.id).eq('type', 'expense');
     if (catData) setCustomCategories(catData);
 
-    // Ambil Anggaran (Budgets)
+    // Ambil Anggaran (Budgets) dengan filter mode terpisah
     const { data: budgetData } = await supabase.from('budgets').select('*').eq('user_id', user.id);
-    if (budgetData) setBudgets(budgetData);
+    if (budgetData) {
+      // Memilah anggaran berdasarkan string marker "___cycle"
+      const parsedBudgets = budgetData.map(b => {
+        const parts = b.category.split('___');
+        const realCategory = parts[0];
+        const mode = parts[1] || 'calendar'; // Jika tidak ada penanda, otomatis kalender (kompatibilitas data lama)
+        return { ...b, realCategory, mode };
+      });
+      // Hanya masukkan ke state anggaran yang sesuai dengan mode saat ini
+      setBudgets(parsedBudgets.filter(b => b.mode === budgetMode));
+    }
 
-    // Ambil Transaksi Bulan Ini
-    const startStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
-    const endDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-    const endStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    // Tentukan Rentang Tanggal Sesuai Mode (Mirip seperti tab Report)
+    const paydayDate = user.user_metadata?.payday_date || 1;
+    let startStr, endStr;
 
+    if (budgetMode === 'calendar' || paydayDate === 1) {
+      startStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
+      const endDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      endStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+      setDisplayDateRange(`${monthNames[selectedMonth]} ${selectedYear}`);
+    } else {
+      const today = new Date();
+      const currentDay = today.getDate();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      
+      let startDate, endDate;
+      if (currentDay >= paydayDate) {
+        startDate = new Date(currentYear, currentMonth, paydayDate);
+        endDate = new Date(currentYear, currentMonth + 1, paydayDate - 1);
+      } else {
+        startDate = new Date(currentYear, currentMonth - 1, paydayDate);
+        endDate = new Date(currentYear, currentMonth, paydayDate - 1);
+      }
+      
+      const formatYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      startStr = formatYMD(startDate);
+      endStr = formatYMD(endDate);
+      
+      const formatDisplay = (d) => `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      setDisplayDateRange(`${formatDisplay(startDate)} - ${formatDisplay(endDate)}`);
+    }
+
+    // Ambil Transaksi Sesuai Rentang Waktu yang Dipilih
     const { data: trxData } = await supabase
       .from('transactions')
       .select('*')
@@ -112,12 +155,17 @@ export default function Budget() {
     setIsLoading(true);
     
     const numericAmount = parseFloat(budgetAmount.replace(/\./g, ''));
-    const existingBudget = budgets.find(b => b.category === selectedCategory);
+    
+    // Cek apakah anggaran untuk kategori INI di mode INI sudah ada
+    const existingBudget = budgets.find(b => b.realCategory === selectedCategory);
+    
+    // Penanda khusus untuk mode (contoh: makanan___cycle)
+    const dbCategoryStr = budgetMode === 'calendar' ? selectedCategory : `${selectedCategory}___${budgetMode}`;
     
     if (existingBudget) {
       await supabase.from('budgets').update({ amount: numericAmount }).eq('id', existingBudget.id);
     } else {
-      await supabase.from('budgets').insert([{ category: selectedCategory, amount: numericAmount, user_id: user.id }]);
+      await supabase.from('budgets').insert([{ category: dbCategoryStr, amount: numericAmount, user_id: user.id }]);
     }
 
     setIsBudgetModalOpen(false);
@@ -135,12 +183,12 @@ export default function Budget() {
 
   const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 
-  // Kalkulasi Total Keseluruhan
+  // Kalkulasi Total Keseluruhan (hanya dari budgets mode aktif)
   let totalLimit = 0;
   let totalUsed = 0;
   budgets.forEach(b => {
     totalLimit += Number(b.amount);
-    const spent = transactions.filter(t => t.category === b.category).reduce((sum, t) => sum + Number(t.amount), 0);
+    const spent = transactions.filter(t => t.category === b.realCategory).reduce((sum, t) => sum + Number(t.amount), 0);
     totalUsed += spent;
   });
 
@@ -158,21 +206,37 @@ export default function Budget() {
           <p className="text-[10px] text-cyan-500 font-bold tracking-widest uppercase">Kontrol Pengeluaran</p>
         </div>
 
-        {/* Filter Bulan */}
-        <div className="px-6 py-3 bg-white border-b border-slate-100 flex gap-2 z-10 shadow-sm">
-          <div className="flex items-center justify-center bg-slate-50 w-10 rounded-xl text-slate-400 border border-slate-100"><FaFilter /></div>
-          <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))} className="flex-1 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-cyan-400 appearance-none">
-            {monthNames.map((month, index) => <option key={index} value={index}>{month}</option>)}
-          </select>
-          <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="w-24 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-cyan-400 appearance-none">
-            {[...Array(5)].map((_, i) => { const year = new Date().getFullYear() - i; return <option key={year} value={year}>{year}</option>; })}
-          </select>
+        {/* Tab Navigasi & Filter */}
+        <div className="px-6 py-3 bg-white flex flex-col gap-3 z-10 shadow-sm border-b border-slate-100">
+          
+          {/* Tombol Opsi Mode Laporan */}
+          <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+             <button onClick={() => setBudgetMode('calendar')} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${budgetMode === 'calendar' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+               <FaCalendarDay/> Kalender
+             </button>
+             <button onClick={() => setBudgetMode('cycle')} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${budgetMode === 'cycle' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+               <FaSyncAlt/> Siklus (Tgl {user?.user_metadata?.payday_date || 1})
+             </button>
+          </div>
+
+          {/* Sembunyikan filter jika di tab siklus */}
+          {budgetMode === 'calendar' && (
+            <div className="flex gap-2">
+              <div className="flex items-center justify-center bg-slate-50 w-10 rounded-xl text-slate-400 border border-slate-100"><FaFilter /></div>
+              <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))} className="flex-1 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-cyan-400 appearance-none">
+                {monthNames.map((month, index) => <option key={index} value={index}>{month}</option>)}
+              </select>
+              <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="w-24 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-cyan-400 appearance-none">
+                {[...Array(5)].map((_, i) => { const year = new Date().getFullYear() - i; return <option key={year} value={year}>{year}</option>; })}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-6 pb-24">
           <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-[2rem] p-6 text-white shadow-xl shadow-purple-500/30 mb-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-3xl -mr-10 -mt-10"></div>
-            <p className="text-[10px] text-purple-50 font-bold tracking-wider mb-1 uppercase">SISA ANGGARAN TOTAL</p>
+            <p className="text-[10px] text-purple-50 font-bold tracking-wider mb-1 uppercase">SISA ANGGARAN TOTAL • {displayDateRange}</p>
             <h2 className="text-3xl font-extrabold tracking-tight mb-6">{formatRupiah(totalLimit - totalUsed)}</h2>
             <div className="w-full bg-white/20 rounded-full h-2 mb-2">
                <div className={`h-2 rounded-full ${totalUsed > totalLimit ? 'bg-red-400' : 'bg-white'}`} style={{width: `${totalLimit > 0 ? Math.min((totalUsed/totalLimit)*100, 100) : 0}%`}}></div>
@@ -193,23 +257,23 @@ export default function Budget() {
           ) : budgets.length === 0 ? (
             <div className="text-center py-10 text-slate-400">
               <FaChartPie className="mx-auto text-4xl mb-3 opacity-20" />
-              <p className="text-sm font-medium">Belum ada anggaran yang diatur.</p>
+              <p className="text-sm font-medium">Belum ada anggaran yang diatur untuk mode ini.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {budgets.map(budget => {
-                const spent = transactions.filter(t => t.category === budget.category).reduce((sum, t) => sum + Number(t.amount), 0);
+                const spent = transactions.filter(t => t.category === budget.realCategory).reduce((sum, t) => sum + Number(t.amount), 0);
                 const limit = Number(budget.amount);
                 const percentage = limit > 0 ? (spent / limit) * 100 : 0;
                 const isOver = spent > limit;
 
-                let catInfo = categoryMap[budget.category];
+                let catInfo = categoryMap[budget.realCategory];
                 if (!catInfo) {
-                  const customCat = customCategories.find(c => c.name === budget.category);
+                  const customCat = customCategories.find(c => c.name === budget.realCategory);
                   if (customCat) {
                     catInfo = { name: customCat.name, icon: renderIcon(customCat.icon), color: 'bg-cyan-500', barColor: 'bg-cyan-400' };
                   } else {
-                    catInfo = { name: budget.category, icon: <FaBox />, color: 'bg-slate-500', barColor: 'bg-slate-400' };
+                    catInfo = { name: budget.realCategory, icon: <FaBox />, color: 'bg-slate-500', barColor: 'bg-slate-400' };
                   }
                 }
 
@@ -297,7 +361,7 @@ export default function Budget() {
             <div className="relative bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 animate-[slideUp_0.2s_ease-out]">
               <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-2xl mb-4 mx-auto"><FaTrash /></div>
               <h3 className="text-xl font-bold text-slate-800 text-center mb-2">Hapus Anggaran?</h3>
-              <p className="text-sm text-slate-500 text-center mb-6">Anda yakin ingin menghapus batasan anggaran untuk kategori <span className="capitalize font-bold text-cyan-600">"{budgetToDelete.category}"</span>?</p>
+              <p className="text-sm text-slate-500 text-center mb-6">Anda yakin ingin menghapus batasan anggaran untuk kategori <span className="capitalize font-bold text-cyan-600">"{budgetToDelete.realCategory}"</span>?</p>
               <div className="flex gap-3">
                 <button onClick={() => setBudgetToDelete(null)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Batal</button>
                 <button onClick={confirmDeleteBudget} disabled={isLoading} className="flex-1 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 transition-colors">{isLoading ? 'Menghapus...' : 'Ya, Hapus'}</button>

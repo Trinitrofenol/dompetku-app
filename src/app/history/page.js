@@ -101,7 +101,7 @@ export default function History() {
   };
 
   const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-  const formatDate = (dateString) => new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  const formatDate = (dateString) => new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
   // PERBAIKAN: Memaksa kedua ID menjadi String sebelum dicocokkan
   const getWalletName = (walletId) => {
@@ -114,6 +114,19 @@ export default function History() {
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
   ];
+
+  // LOGIKA PENGELOMPOKAN TRANSAKSI BERDASARKAN TANGGAL
+  const groupedTransactions = transactions.reduce((group, trx) => {
+    const date = trx.date;
+    if (!group[date]) {
+      group[date] = [];
+    }
+    group[date].push(trx);
+    return group;
+  }, {});
+
+  // Mengurutkan tanggal dari yang terbaru
+  const sortedDates = Object.keys(groupedTransactions).sort((a, b) => new Date(b) - new Date(a));
 
   if (isCheckingAuth) {
     return (
@@ -144,48 +157,67 @@ export default function History() {
           </select>
         </div>
 
-        {/* Daftar Transaksi */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 pb-24">
+        {/* Daftar Transaksi Dikelompokkan */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 pb-24 relative">
           {isLoading ? (
             <p className="text-center text-slate-400 text-sm mt-10 animate-pulse">Memuat data...</p>
-          ) : transactions.length === 0 ? (
+          ) : sortedDates.length === 0 ? (
             <div className="text-center py-10 text-slate-400">
               <FaReceipt className="mx-auto text-4xl mb-3 opacity-20" />
               <p className="text-sm font-medium">Belum ada transaksi di bulan ini.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {transactions.map((trx) => (
-                <div key={trx.id} className="relative bg-white p-4 rounded-3xl shadow-lg shadow-slate-200/50 border border-slate-100 flex items-center justify-between transition-transform hover:scale-[1.01] group">
+            <div className="space-y-6">
+              {sortedDates.map((dateStr) => (
+                <div key={dateStr} className="space-y-3">
                   
-                  {/* TOMBOL HAPUS (Muncul saat di-hover/tap) */}
-                  <button 
-                    onClick={() => setTransactionToDelete(trx)}
-                    className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <FaTrash className="text-xs" />
-                  </button>
-
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-md ${
-                      trx.type === 'expense' ? 'bg-orange-50 text-orange-500' :
-                      (trx.type === 'income' || trx.type === 'debt_in' || trx.type === 'debt_payment_in') ? 'bg-emerald-50 text-emerald-500' :
-                      'bg-cyan-50 text-cyan-500'
-                    }`}>
-                      {(trx.type === 'expense' || trx.type === 'debt_out' || trx.type === 'debt_payment_out') && <FaArrowDown />}
-                      {(trx.type === 'income' || trx.type === 'debt_in' || trx.type === 'debt_payment_in') && <FaArrowUp />}
-                      {trx.type === 'transfer' && <FaExchangeAlt />}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800 text-sm capitalize">{trx.category.replace('_', ' ')}</p>
-                      <p className="text-[10px] text-slate-400 font-bold mt-0.5">{formatDate(trx.date)} • <span className="text-cyan-600">{getWalletName(trx.wallet_from)}</span>{trx.type === 'transfer' && ` → ${getWalletName(trx.wallet_to)}`}</p>
-                      {trx.note && <p className="text-xs text-slate-500 mt-1 italic line-clamp-1">"{trx.note}"</p>}
-                    </div>
-                  </div>
-                  <div className="text-right pr-2">
-                    <p className={`font-bold text-sm ${(trx.type === 'expense' || trx.type === 'debt_out' || trx.type === 'debt_payment_out') ? 'text-orange-500' : (trx.type === 'income' || trx.type === 'debt_in' || trx.type === 'debt_payment_in') ? 'text-emerald-500' : 'text-slate-800'}`}>
-                      {(trx.type === 'expense' || trx.type === 'debt_out' || trx.type === 'debt_payment_out') ? '-' : (trx.type === 'income' || trx.type === 'debt_in' || trx.type === 'debt_payment_in') ? '+' : ''}{formatRupiah(trx.amount)}
+                  {/* Header Kelompok Tanggal */}
+                  <div className="sticky top-0 bg-slate-50/90 backdrop-blur-sm z-10 py-1 mb-2">
+                    <p className="text-[10px] font-bold text-slate-500 bg-white inline-block px-3 py-1.5 rounded-xl shadow-sm border border-slate-100 uppercase tracking-wider">
+                      {formatDate(dateStr)}
                     </p>
+                  </div>
+                  
+                  {/* List Transaksi dalam Tanggal Ini */}
+                  <div className="space-y-3">
+                    {groupedTransactions[dateStr].map((trx) => (
+                      <div key={trx.id} className="relative bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between transition-all hover:shadow-md group">
+                        
+                        {/* TOMBOL HAPUS */}
+                        <button 
+                          onClick={() => setTransactionToDelete(trx)}
+                          className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                        >
+                          <FaTrash className="text-xs" />
+                        </button>
+
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-inner ${
+                            trx.type === 'expense' ? 'bg-orange-50 text-orange-500' :
+                            (trx.type === 'income' || trx.type === 'debt_in' || trx.type === 'debt_payment_in') ? 'bg-emerald-50 text-emerald-500' :
+                            'bg-cyan-50 text-cyan-500'
+                          }`}>
+                            {(trx.type === 'expense' || trx.type === 'debt_out' || trx.type === 'debt_payment_out') && <FaArrowDown />}
+                            {(trx.type === 'income' || trx.type === 'debt_in' || trx.type === 'debt_payment_in') && <FaArrowUp />}
+                            {trx.type === 'transfer' && <FaExchangeAlt />}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800 text-sm capitalize">{trx.category.replace('_', ' ')}</p>
+                            {/* Tanggal dihapus dari sini karena sudah ada di header kelompok */}
+                            <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                              <span className="text-cyan-600">{getWalletName(trx.wallet_from)}</span>
+                              {trx.type === 'transfer' && ` → ${getWalletName(trx.wallet_to)}`}
+                            </p>
+                            {trx.note && <p className="text-xs text-slate-500 mt-1 italic line-clamp-1">"{trx.note}"</p>}
+                          </div>
+                        </div>
+                        <div className="text-right pr-2">
+                          <p className={`font-bold text-sm ${(trx.type === 'expense' || trx.type === 'debt_out' || trx.type === 'debt_payment_out') ? 'text-orange-500' : (trx.type === 'income' || trx.type === 'debt_in' || trx.type === 'debt_payment_in') ? 'text-emerald-500' : 'text-slate-800'}`}>
+                            {(trx.type === 'expense' || trx.type === 'debt_out' || trx.type === 'debt_payment_out') ? '-' : (trx.type === 'income' || trx.type === 'debt_in' || trx.type === 'debt_payment_in') ? '+' : ''}{formatRupiah(trx.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}

@@ -36,19 +36,32 @@ export default function Home() {
   
   const [wallets, setWallets] = useState([]);
   const [walletBalances, setWalletBalances] = useState({});
+  
+  const gradientColors = [
+    'from-cyan-400 to-blue-500',
+    'from-amber-400 to-orange-500',
+    'from-purple-400 to-pink-500',
+    'from-emerald-400 to-teal-500',
+    'from-rose-400 to-red-500',
+    'from-indigo-400 to-violet-500'
+  ];
+
+  // STATE UNTUK KANTONG BARU (DENGAN WARNA)
   const [newWalletName, setNewWalletName] = useState('');
-  const [walletToDelete, setWalletToDelete] = useState(null);
   const [newWalletIcon, setNewWalletIcon] = useState('FaWallet');
+  const [newWalletColor, setNewWalletColor] = useState(gradientColors[0]);
+  const [walletToDelete, setWalletToDelete] = useState(null);
 
   const [transactions, setTransactions] = useState([]); 
 
-  // STATE UNTUK RINCIAN KANTONG & EDIT
+  // STATE UNTUK RINCIAN KANTONG & EDIT (DENGAN WARNA)
   const [isWalletDetailOpen, setIsWalletDetailOpen] = useState(false);
   const [selectedWalletDetail, setSelectedWalletDetail] = useState(null);
   const [isWalletSettingsOpen, setIsWalletSettingsOpen] = useState(false);
   const [isEditWalletModalOpen, setIsEditWalletModalOpen] = useState(false);
   const [editWalletName, setEditWalletName] = useState('');
   const [editWalletIcon, setEditWalletIcon] = useState('');
+  const [editWalletColor, setEditWalletColor] = useState('');
 
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
   const [debtModalView, setDebtModalView] = useState('list'); 
@@ -82,14 +95,6 @@ export default function Home() {
   const [isCycleModalOpen, setIsCycleModalOpen] = useState(false);
   const [cycleDateInput, setCycleDateInput] = useState(1);
   const [successNotification, setSuccessNotification] = useState(null);
-
-  const gradientColors = [
-    'from-cyan-400 to-blue-500',
-    'from-amber-400 to-orange-500',
-    'from-purple-400 to-pink-500',
-    'from-emerald-400 to-teal-500',
-    'from-rose-400 to-red-500'
-  ];
 
   const iconOptions = ['FaBox', 'FaCoffee', 'FaGamepad', 'FaHome', 'FaBus', 'FaTshirt', 'FaHeartbeat', 'FaBook', 'FaDumbbell', 'FaWallet', 'FaMoneyBill', 'FaBuilding'];
 
@@ -285,20 +290,18 @@ export default function Home() {
   const handleCreateWallet = async () => {
     if (!newWalletName) return alert("Nama kantong wajib diisi!");
     setIsLoading(true);
-    const randomColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
-    const { error } = await supabase.from('wallets').insert([{ name: newWalletName, icon: newWalletIcon, color_theme: randomColor, user_id: user.id }]);
+    const { error } = await supabase.from('wallets').insert([{ name: newWalletName, icon: newWalletIcon, color_theme: newWalletColor, user_id: user.id }]);
     setIsLoading(false);
     if (error) alert("Gagal membuat kantong: " + error.message);
     else { setIsNewWalletModalOpen(false); setNewWalletName(''); setNewWalletIcon('FaWallet'); fetchDashboardData(); }
   };
 
-  // FUNGSI UPDATE KANTONG (BARU)
   const handleUpdateWallet = async () => {
     if (!editWalletName) return alert("Nama kantong wajib diisi!");
     setIsLoading(true);
     const { error } = await supabase
       .from('wallets')
-      .update({ name: editWalletName, icon: editWalletIcon })
+      .update({ name: editWalletName, icon: editWalletIcon, color_theme: editWalletColor })
       .eq('id', selectedWalletDetail.id);
 
     setIsLoading(false);
@@ -306,8 +309,7 @@ export default function Home() {
       alert("Gagal mengupdate kantong: " + error.message);
     } else {
       setIsEditWalletModalOpen(false);
-      // Update state lokal agar Rincian Kantong langsung berubah
-      setSelectedWalletDetail({ ...selectedWalletDetail, name: editWalletName, icon: editWalletIcon });
+      setSelectedWalletDetail({ ...selectedWalletDetail, name: editWalletName, icon: editWalletIcon, color_theme: editWalletColor });
       fetchDashboardData();
     }
   };
@@ -315,7 +317,6 @@ export default function Home() {
   const confirmDeleteWallet = async () => {
     if (!walletToDelete) return;
 
-    // PROTEKSI: Cek saldo sebelum menghapus kantong
     const currentBalance = walletBalances[walletToDelete.id] || 0;
     if (currentBalance !== 0) {
       setWalletToDelete(null);
@@ -465,52 +466,52 @@ export default function Home() {
     <main className="min-h-[100dvh] bg-slate-50 flex justify-center text-slate-800 font-sans">
       <div className="w-full max-w-md bg-slate-50 h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden">
         
-        {/* AREA KONTEN YANG BISA DI-SCROLL */}
-        <div className="flex-1 overflow-y-auto pb-24">
-          
-          <div className="px-6 pt-3 pb-4">
-            <div className="flex justify-between items-center mb-1">
-              <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
-              
-              <div className="relative">
-                <button 
-                  onClick={() => setIsSettingsModalOpen(!isSettingsModalOpen)} 
-                  className="w-10 h-10 rounded-full bg-white shadow-sm border border-slate-100 flex items-center justify-center hover:bg-slate-100 transition-colors focus:outline-none relative z-10" 
-                  title="Pengaturan"
-                >
-                  <FaCog className="text-cyan-500" />
-                </button>
+        {/* HEADER TETAP (STICKY) DENGAN Z-INDEX TINGGI */}
+        <div className="px-6 pt-3 pb-4 bg-slate-50/95 backdrop-blur-md z-[60] shrink-0 border-b border-slate-100/60 shadow-sm relative">
+          <div className="flex justify-between items-center mb-1">
+            <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
+            
+            <div className="relative">
+              <button 
+                onClick={() => setIsSettingsModalOpen(!isSettingsModalOpen)} 
+                className="w-10 h-10 rounded-full bg-white shadow-sm border border-slate-100 flex items-center justify-center hover:bg-slate-100 transition-colors focus:outline-none relative z-10" 
+                title="Pengaturan"
+              >
+                <FaCog className="text-cyan-500" />
+              </button>
 
-                {isSettingsModalOpen && (
-                  <>
-                    <div className="fixed inset-0 z-[100]" onClick={() => setIsSettingsModalOpen(false)}></div>
-                    <div className="absolute top-12 right-0 w-48 bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 z-[105] py-2 animate-[fadeIn_0.15s_ease-out] origin-top-right">
-                      <div className="absolute -top-2 right-3 w-4 h-4 bg-white border-t border-l border-slate-100 rotate-45"></div>
-                      <div className="relative z-10">
-                        <button onClick={() => { setIsSettingsModalOpen(false); setIsCategoryModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
-                          <FaTags className="text-xs" /> Kelola Kategori
-                        </button>
-                        <div className="w-full h-px bg-slate-100 my-1"></div>
-                        <button onClick={() => { setIsSettingsModalOpen(false); setCycleDateInput(user?.user_metadata?.payday_date || 1); setIsCycleModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
-                          <FaCalendarAlt className="text-xs" /> Siklus Laporan
-                        </button>
-                        <div className="w-full h-px bg-slate-100 my-1"></div>
-                        <button onClick={() => { setIsSettingsModalOpen(false); setIsResetModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-3">
-                          <FaTrash className="text-xs" /> Reset Data
-                        </button>
-                        <div className="w-full h-px bg-slate-100 my-1"></div>
-                        <button onClick={() => { setIsSettingsModalOpen(false); setIsLogoutModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
-                          <FaSignOutAlt className="text-xs" /> Keluar Akun
-                        </button>
-                      </div>
+              {isSettingsModalOpen && (
+                <>
+                  <div className="fixed inset-0 z-[100]" onClick={() => setIsSettingsModalOpen(false)}></div>
+                  <div className="absolute top-12 right-0 w-48 bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 z-[105] py-2 animate-[fadeIn_0.15s_ease-out] origin-top-right">
+                    <div className="absolute -top-2 right-3 w-4 h-4 bg-white border-t border-l border-slate-100 rotate-45"></div>
+                    <div className="relative z-10">
+                      <button onClick={() => { setIsSettingsModalOpen(false); setIsCategoryModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                        <FaTags className="text-xs" /> Kelola Kategori
+                      </button>
+                      <div className="w-full h-px bg-slate-100 my-1"></div>
+                      <button onClick={() => { setIsSettingsModalOpen(false); setCycleDateInput(user?.user_metadata?.payday_date || 1); setIsCycleModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                        <FaCalendarAlt className="text-xs" /> Siklus Laporan
+                      </button>
+                      <div className="w-full h-px bg-slate-100 my-1"></div>
+                      <button onClick={() => { setIsSettingsModalOpen(false); setIsResetModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-3">
+                        <FaTrash className="text-xs" /> Reset Data
+                      </button>
+                      <div className="w-full h-px bg-slate-100 my-1"></div>
+                      <button onClick={() => { setIsSettingsModalOpen(false); setIsLogoutModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                        <FaSignOutAlt className="text-xs" /> Keluar Akun
+                      </button>
                     </div>
-                  </>
-                )}
-              </div>
+                  </div>
+                </>
+              )}
             </div>
-            <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">{user?.email || 'Keuangan Anda'}</p>
           </div>
-          
+          <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">{user?.email || 'Keuangan Anda'}</p>
+        </div>
+        
+        {/* AREA KONTEN YANG BISA DI-SCROLL */}
+        <div className="flex-1 overflow-y-auto pb-24 pt-6">
           <div className="px-6 mb-6">
             <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2rem] p-6 text-white shadow-xl shadow-orange-500/30 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-40 h-40 bg-white/20 rounded-full blur-3xl -mr-10 -mt-10"></div>
@@ -527,20 +528,24 @@ export default function Home() {
           <div className="px-6 mb-6">
             <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-bold text-slate-800 flex items-center gap-2"><FaWallet className="text-cyan-500" /> Kantong Anda</h3></div>
             
-            {/* TAMPILAN KARTU KANTONG DIPERBERSIH */}
+            {/* TAMPILAN KARTU KANTONG DENGAN AKSEN 1/4 LINGKARAN */}
             <div className="grid grid-cols-2 gap-4 mb-4">
               {wallets.map(w => (
-                <div key={w.id} onClick={() => { setSelectedWalletDetail(w); setIsWalletDetailOpen(true); setIsWalletSettingsOpen(false); }} className="relative bg-white rounded-3xl p-5 shadow-lg shadow-slate-200/50 border border-slate-100 flex flex-col items-start transition-transform hover:scale-[1.02] cursor-pointer group">
-                  <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${w.color_theme} flex items-center justify-center text-white text-xl mb-4 shadow-md`}>
+                <div key={w.id} onClick={() => { setSelectedWalletDetail(w); setIsWalletDetailOpen(true); setIsWalletSettingsOpen(false); }} className="relative bg-white rounded-3xl p-5 shadow-lg shadow-slate-200/50 border border-slate-100 flex flex-col items-start transition-transform hover:scale-[1.02] cursor-pointer group overflow-hidden">
+                  
+                  {/* Aksen Seperempat Lingkaran di Pojok Kanan Atas */}
+                  <div className={`absolute top-0 right-0 w-20 h-20 bg-gradient-to-br ${w.color_theme} opacity-15 rounded-bl-[100%] transition-transform duration-500 group-hover:scale-110`}></div>
+                  
+                  <div className={`relative z-10 w-10 h-10 rounded-2xl bg-gradient-to-br ${w.color_theme} flex items-center justify-center text-white text-xl mb-4 shadow-md`}>
                     {renderIcon(w.icon || 'FaWallet')}
                   </div>
-                  <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase line-clamp-1 w-full pr-2">{w.name}</p>
-                  <p className="text-sm font-bold text-slate-800">{formatRupiah(walletBalances[w.id] || 0)}</p>
+                  <p className="relative z-10 text-[10px] text-slate-400 font-bold mb-1 uppercase line-clamp-1 w-full pr-2">{w.name}</p>
+                  <p className="relative z-10 text-sm font-bold text-slate-800">{formatRupiah(walletBalances[w.id] || 0)}</p>
                 </div>
               ))}
             </div>
 
-            <button onClick={() => setIsNewWalletModalOpen(true)} className="w-full bg-white hover:bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-4 flex items-center justify-center gap-3 transition-colors group shadow-sm">
+            <button onClick={() => { setNewWalletColor(gradientColors[0]); setIsNewWalletModalOpen(true); }} className="w-full bg-white hover:bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-4 flex items-center justify-center gap-3 transition-colors group shadow-sm">
               <div className="w-8 h-8 rounded-full bg-cyan-50 flex items-center justify-center text-cyan-500 group-hover:bg-cyan-500 group-hover:text-white transition-colors"><FaPlus /></div>
               <span className="text-sm font-bold text-slate-500 group-hover:text-cyan-600">Tambah Kantong</span>
             </button>
@@ -548,15 +553,20 @@ export default function Home() {
 
           <div className="px-6 mb-8">
             <div className="grid grid-cols-2 gap-4">
-               <div onClick={() => openDebtModal('payable')} className="bg-white rounded-3xl p-5 shadow-lg shadow-slate-200/50 border border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors">
-                 <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center mb-3"><FaArrowDown className="text-orange-500 text-sm" /></div>
-                 <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase">Hutang Saya</p>
-                 <p className="text-sm font-bold text-slate-800">{formatRupiah(totalPayable)}</p>
+               {/* TAMPILAN KARTU HUTANG DENGAN AKSEN */}
+               <div onClick={() => openDebtModal('payable')} className="relative bg-white rounded-3xl p-5 shadow-lg shadow-slate-200/50 border border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors group overflow-hidden">
+                 <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-400 to-amber-500 opacity-10 rounded-bl-[100%] transition-transform duration-500 group-hover:scale-110"></div>
+                 <div className="relative z-10 w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center mb-3"><FaArrowDown className="text-orange-500 text-sm" /></div>
+                 <p className="relative z-10 text-[10px] text-slate-400 font-bold mb-1 uppercase">Hutang Saya</p>
+                 <p className="relative z-10 text-sm font-bold text-slate-800">{formatRupiah(totalPayable)}</p>
                </div>
-               <div onClick={() => openDebtModal('receivable')} className="bg-white rounded-3xl p-5 shadow-lg shadow-slate-200/50 border border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors">
-                 <div className="w-8 h-8 rounded-full bg-cyan-50 flex items-center justify-center mb-3"><FaArrowUp className="text-cyan-500 text-sm" /></div>
-                 <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase">Piutang Orang</p>
-                 <p className="text-sm font-bold text-slate-800">{formatRupiah(totalReceivable)}</p>
+               
+               {/* TAMPILAN KARTU PIUTANG DENGAN AKSEN */}
+               <div onClick={() => openDebtModal('receivable')} className="relative bg-white rounded-3xl p-5 shadow-lg shadow-slate-200/50 border border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors group overflow-hidden">
+                 <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-500 opacity-10 rounded-bl-[100%] transition-transform duration-500 group-hover:scale-110"></div>
+                 <div className="relative z-10 w-8 h-8 rounded-full bg-cyan-50 flex items-center justify-center mb-3"><FaArrowUp className="text-cyan-500 text-sm" /></div>
+                 <p className="relative z-10 text-[10px] text-slate-400 font-bold mb-1 uppercase">Piutang Orang</p>
+                 <p className="relative z-10 text-sm font-bold text-slate-800">{formatRupiah(totalReceivable)}</p>
                </div>
             </div>
           </div>
@@ -564,7 +574,7 @@ export default function Home() {
         </div>
 
         {/* NAVIGASI BAWAH */}
-        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] flex justify-between items-center px-6 py-2 pb-4 z-10 pointer-events-auto">
+        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] flex justify-between items-center px-6 py-2 pb-4 z-[60] pointer-events-auto">
           <div className="flex flex-col items-center gap-1 cursor-pointer"><FaHome className="text-cyan-500 text-xl" /><span className="text-[10px] font-bold text-cyan-500">Home</span></div>
           <Link href="/budget" className="flex flex-col items-center gap-1 cursor-pointer opacity-50 hover:opacity-100 transition-opacity"><FaChartPie className="text-slate-400 text-xl" /><span className="text-[10px] font-bold text-slate-500">Budget</span></Link>
           <div className="relative -top-8"><button onClick={() => setIsModalOpen(true)} className="w-16 h-16 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center text-white text-2xl shadow-xl shadow-cyan-500/30 border-4 border-slate-50 active:scale-95 transition-transform"><FaPlus /></button></div>
@@ -747,22 +757,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* MODAL KONFIRMASI HAPUS KANTONG */}
-        {walletToDelete && (
-          <div className="fixed inset-0 z-[130] flex justify-center items-center px-6">
-            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setWalletToDelete(null)}></div>
-            <div className="relative bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 animate-[slideUp_0.2s_ease-out]">
-              <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-2xl mb-4 mx-auto"><FaTrash /></div>
-              <h3 className="text-xl font-bold text-slate-800 text-center mb-2">Hapus Kantong?</h3>
-              <p className="text-sm text-slate-500 text-center mb-6">Anda yakin ingin menghapus kantong <span className="text-cyan-500 font-bold">"{walletToDelete.name}"</span>?</p>
-              <div className="flex gap-3">
-                <button onClick={() => setWalletToDelete(null)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Batal</button>
-                <button onClick={confirmDeleteWallet} disabled={isLoading} className="flex-1 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 transition-colors">{isLoading ? 'Menghapus...' : 'Ya, Hapus'}</button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* MODAL KONFIRMASI HAPUS HUTANG */}
         {debtToDelete && (
           <div className="fixed inset-0 z-[110] flex justify-center items-center px-6">
@@ -788,6 +782,15 @@ export default function Home() {
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-slate-800">Buat Kantong Baru</h3>
                   <button onClick={() => setIsNewWalletModalOpen(false)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100"><FaTimes /></button>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-[10px] font-bold mb-2 text-slate-400">PILIH WARNA</p>
+                  <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide px-1">
+                    {gradientColors.map((color, idx) => (
+                      <button key={idx} onClick={() => setNewWalletColor(color)} className={`w-10 h-10 shrink-0 rounded-full bg-gradient-to-br ${color} transition-all duration-200 ${newWalletColor === color ? 'ring-4 ring-cyan-200 scale-110 shadow-md' : 'opacity-60 hover:opacity-100 hover:scale-105'}`} />
+                    ))}
+                  </div>
                 </div>
 
                 <div className="mb-6">
@@ -820,6 +823,15 @@ export default function Home() {
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-slate-800">Edit Kantong</h3>
                   <button onClick={() => setIsEditWalletModalOpen(false)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100"><FaTimes /></button>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-[10px] font-bold mb-2 text-slate-400">PILIH WARNA</p>
+                  <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide px-1">
+                    {gradientColors.map((color, idx) => (
+                      <button key={idx} onClick={() => setEditWalletColor(color)} className={`w-10 h-10 shrink-0 rounded-full bg-gradient-to-br ${color} transition-all duration-200 ${editWalletColor === color ? 'ring-4 ring-cyan-200 scale-110 shadow-md' : 'opacity-60 hover:opacity-100 hover:scale-105'}`} />
+                    ))}
+                  </div>
                 </div>
 
                 <div className="mb-6">
@@ -953,7 +965,7 @@ export default function Home() {
                         <>
                           <div className="fixed inset-0 z-[105]" onClick={() => setIsWalletSettingsOpen(false)}></div>
                           <div className="absolute top-10 right-0 w-44 bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 z-[110] py-2 animate-[fadeIn_0.15s_ease-out] origin-top-right">
-                            <button onClick={() => { setIsWalletSettingsOpen(false); setEditWalletName(selectedWalletDetail.name); setEditWalletIcon(selectedWalletDetail.icon || 'FaWallet'); setIsEditWalletModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                            <button onClick={() => { setIsWalletSettingsOpen(false); setEditWalletColor(selectedWalletDetail.color_theme || gradientColors[0]); setEditWalletName(selectedWalletDetail.name); setEditWalletIcon(selectedWalletDetail.icon || 'FaWallet'); setIsEditWalletModalOpen(true); }} className="w-full text-left px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">
                               <FaEdit className="text-xs" /> Edit Kantong
                             </button>
                             <div className="w-full h-px bg-slate-100 my-1"></div>
@@ -984,7 +996,7 @@ export default function Home() {
                 </div>
 
                 {/* Info Kantong Utama */}
-                <div className="flex flex-col items-center mb-6 shrink-0">
+                <div className="flex flex-col items-center mb-6 shrink-0 relative">
                   <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${selectedWalletDetail.color_theme} flex items-center justify-center text-white text-3xl mb-3 shadow-md`}>
                     {renderIcon(selectedWalletDetail.icon || 'FaWallet')}
                   </div>
