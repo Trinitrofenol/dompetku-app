@@ -1,6 +1,5 @@
 import { Lato } from "next/font/google";
 import "./globals.css";
-import ClientBackHandler from "../components/ClientBackHandler";
 
 // Font Lato memerlukan spesifikasi 'weight' (ketebalan font)
 const lato = Lato({ 
@@ -18,7 +17,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="id">
       <body className={lato.className}>
-        <ClientBackHandler />
         {children}
       </body>
     </html>
